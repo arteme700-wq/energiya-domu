@@ -39,7 +39,16 @@ public final class Updater {
     private Updater() { }
 
     /** @return текст результату (для налаштувань / журналу). Виконувати не в UI-потоці. */
+    /** Перевіряє і запам'ятовує результат (видно в налаштуваннях — на деяких планшетах журнал застосунків вимкнено). */
     public static synchronized String check(Context ctx) {
+        String r = doCheck(ctx);
+        String t = new java.text.SimpleDateFormat("dd.MM HH:mm", java.util.Locale.US).format(new java.util.Date());
+        ctx.getSharedPreferences("cfg", Context.MODE_PRIVATE).edit().putString("upd_last", t + " — " + r).apply();
+        Log.w(TAG, r);
+        return r;
+    }
+
+    private static String doCheck(Context ctx) {
         try {
             String base = new Prefs(ctx).updateUrl();
             if (!base.endsWith("/")) base += "/";

@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 7.0 не має кореня Let's Encrypt (ISRG Root X1/X2), яким підписано ntfy.sh -->
+<!-- Старі Android 7 не мають коренів Let's Encrypt (ntfy.sh, файли релізів GitHub) і можуть не мати USERTrust (github.com) -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system"/>
             <certificates src="@raw/isrg_root_x1"/>
             <certificates src="@raw/isrg_root_x2"/>
+            <certificates src="@raw/usertrust_ecc_certification_authority"/>
+            <certificates src="@raw/usertrust_rsa_certification_authority"/>
         </trust-anchors>
     </base-config>
 </network-security-config>

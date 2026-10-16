@@ -86,6 +86,9 @@ public final class SettingsActivity extends Activity {
         rg.setOnClickListener(v -> status.setText("Утримуйте кнопку, щоб змінити код"));
         title(l, "Оновлення (версія " + BuildConfig.VERSION_NAME + (Updater.isOwner(this) ? ", тихе встановлення" : "") + ")");
         upd = field(l, "Адреса перевірки (порожньо = GitHub)", prefs.updateUrl().equals(Updater.DEFAULT_URL) ? "" : prefs.updateUrl(), InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        TextView last = new TextView(this); last.setTextSize(16);
+        last.setText("Остання перевірка: " + getSharedPreferences("cfg", MODE_PRIVATE).getString("upd_last", "ще не було"));
+        l.addView(last);
         Button chk = new Button(this); chk.setText("Перевірити оновлення зараз"); l.addView(chk);
         chk.setOnClickListener(v -> { save(); status.setText("Перевіряю оновлення…"); new Thread(() -> { String r = Updater.check(this); h.post(() -> status.setText(r)); }).start(); });
         status = new TextView(this); status.setTextSize(16); l.addView(status);
