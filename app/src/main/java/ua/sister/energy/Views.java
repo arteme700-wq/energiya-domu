@@ -104,17 +104,17 @@ final class Views {
         final float u; double[][] d = new double[3][24]; int nowH;
         DayChart(Context c, float u) { super(c); this.u = u; }
         @Override protected void onDraw(Canvas c) {
-            float w = getWidth(), h = getHeight(), padB = 24 * u, top = 20 * u;
+            float w = getWidth(), h = getHeight(), padB = 34 * u, top = 26 * u;
             double mx = 2;
             for (double[] a : d) for (double x : a) if (!Double.isNaN(x)) mx = Math.max(mx, x);
             mx = Math.ceil(mx / 2) * 2;
-            Paint gl = paint(LINE, 13 * u), tl = paint(0xFF475569, 13 * u); tl.setTextAlign(Paint.Align.RIGHT);
+            Paint gl = paint(0xFF334155, 20 * u), tl = paint(0xFF94A3B8, 20 * u); tl.setTextAlign(Paint.Align.RIGHT);
             for (int k = 2; k <= mx; k += 2) {
                 float y = (float) (h - padB - k / mx * (h - padB - top));
                 c.drawLine(0, y, w, y, gl); c.drawText(k + " кВт", w, y - 3 * u, tl);
             }
-            Paint xl = paint(DIM, 15 * u); xl.setTextAlign(Paint.Align.CENTER);
-            for (int hh : new int[]{0, 6, 12, 18, 23}) c.drawText(String.format("%02d", hh), x(hh, w), h - 4 * u, xl);
+            Paint xl = paint(0xFFCBD5E1, 22 * u); xl.setTextAlign(Paint.Align.CENTER);
+            for (int hh : new int[]{0, 6, 12, 18}) c.drawText(String.format("%02d", hh), x(hh, w), h - 4 * u, xl);
             int[] cols = {YEL, PUR, BLU};
             for (int k = 0; k < 3; k++) {
                 Path p = new Path(); boolean st = false;
@@ -124,7 +124,7 @@ final class Views {
                     float y = (float) (h - padB - v / mx * (h - padB - top));
                     if (!st) { p.moveTo(x(i, w), y); st = true; c.drawCircle(x(i, w), y, 3 * u, paint(cols[k], 0)); } else p.lineTo(x(i, w), y);
                 }
-                Paint lp = paint(cols[k], 0); lp.setStyle(Paint.Style.STROKE); lp.setStrokeWidth(3.5f * u);
+                Paint lp = paint(cols[k], 0); lp.setStyle(Paint.Style.STROKE); lp.setStrokeWidth(5f * u);
                 lp.setStrokeJoin(Paint.Join.ROUND);
                 if (k == 2) lp.setPathEffect(new DashPathEffect(new float[]{9 * u, 6 * u}, 0));
                 c.drawPath(p, lp);
@@ -143,12 +143,12 @@ final class Views {
         WeekChart(Context c, float u) { super(c); this.u = u; }
         @Override protected void onDraw(Canvas c) {
             if (d.length == 0) return;
-            float w = getWidth(), h = getHeight(), padB = 26 * u, top = 22 * u;
+            float w = getWidth(), h = getHeight(), padB = 34 * u, top = 30 * u;
             double mx = 5;
             for (Object[] r : d) mx = Math.max(mx, Math.max((Double) r[1], (Double) r[2]));
             float slot = w / d.length, bw = slot * 0.34f;
-            Paint lp = paint(DIM, 16 * u); lp.setTextAlign(Paint.Align.CENTER);
-            Paint vp = paint(GRY, 12 * u); vp.setTextAlign(Paint.Align.CENTER);
+            Paint lp = paint(DIM, 22 * u); lp.setTextAlign(Paint.Align.CENTER);
+            Paint vp = paint(0xFFE2E8F0, 20 * u); vp.setTextAlign(Paint.Align.CENTER);
             Calendar cal = Calendar.getInstance();
             for (int i = 0; i < d.length; i++) {
                 double pv = (Double) d[i][1], ld = (Double) d[i][2];
@@ -156,9 +156,9 @@ final class Views {
                 float hp = (float) (pv / mx * (h - padB - top)), hl = (float) (ld / mx * (h - padB - top));
                 c.drawRoundRect(x0 - bw - 1, h - padB - hp, x0 - 1, h - padB, 3, 3, paint(YEL, 0));
                 c.drawRoundRect(x0 + 1, h - padB - hl, x0 + bw + 1, h - padB, 3, 3, paint(PUR, 0));
-                if (ld > 0) c.drawText(String.format(java.util.Locale.US, "%.0f", ld), x0 + bw / 2, h - padB - hl - 4 * u, vp);
+                if (ld > 0) c.drawText(String.format(java.util.Locale.US, "%.0f", ld), x0 + bw / 2, h - padB - hl - 5 * u, vp);
                 cal.setTimeInMillis((Long) d[i][0]);
-                lp.setColor(i == d.length - 1 ? TXT : DIM);
+                lp.setColor(i == d.length - 1 ? 0xFFFFFFFF : 0xFFCBD5E1);
                 c.drawText(DN[cal.get(Calendar.DAY_OF_WEEK) - 1], x0, h - 5 * u, lp);
             }
         }

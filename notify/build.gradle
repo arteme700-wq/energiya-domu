@@ -1,0 +1,26 @@
+plugins { id 'com.android.application' }
+def ks = new Properties()
+def ksf = file('/workspace/sister_app/keystore/keystore.properties')
+if (ksf.exists()) ks.load(new FileInputStream(ksf))
+android {
+    namespace 'ua.sister.energy.notify'
+    compileSdk 34
+    defaultConfig {
+        applicationId "ua.sister.energy.notify"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+    }
+    signingConfigs {
+        release {
+            storeFile file('/workspace/sister_app/keystore/release.jks')
+            storePassword ks['storePassword']; keyAlias ks['keyAlias']; keyPassword ks['keyPassword']
+        }
+    }
+    buildTypes { release { minifyEnabled false; signingConfig signingConfigs.release } }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
+    buildFeatures { buildConfig true }
+    lint { abortOnError false; checkReleaseBuilds false }
+}
+dependencies { implementation 'com.google.zxing:core:3.5.3' }

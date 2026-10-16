@@ -22,3 +22,10 @@ adb shell dpm set-device-owner ua.sister.energy/.AdminReceiver
 Інакше Android покаже звичайний запит на встановлення.
 
 Регістри Deye — за [ha-solarman](https://github.com/davidrapan/ha-solarman) (`deye_hybrid.yaml`); протокол JK BMS — за [esphome-jk-bms](https://github.com/syssi/esphome-jk-bms).
+
+## Сповіщення на телефон
+Планшет надсилає події (зникло/з'явилось світло, низький заряд АКБ, аварія інвертора, немає зв'язку з BMS або логером) у випадкову тему на [ntfy.sh](https://ntfy.sh).
+Модуль `notify/` — окремий застосунок для телефона «Енергія — сповіщення» (`ua.sister.energy.notify`): прив'язка скануванням QR з налаштувань планшета або введенням коду, великі шрифти, підказки для Xiaomi/HyperOS.
+Реліз містить `energiya-notify.apk` і `version-notify.json`; телефон перевіряє оновлення і пропонує встановити.
+
+Android 7 не довіряє сертифікатам Let's Encrypt (ntfy.sh) — тому в застосунки вбудовано кореневі сертифікати ISRG Root X1/X2 (`res/raw`, `network_security_config.xml`).

@@ -9,8 +9,8 @@ android {
         applicationId "ua.sister.energy"
         minSdk 24
         targetSdk 34
-        versionCode 4
-        versionName "1.0.3"
+        versionCode 6
+        versionName "1.1.0"
     }
     signingConfigs {
         release {
@@ -25,3 +25,4 @@ android {
     buildFeatures { buildConfig true }
     lint { abortOnError false; checkReleaseBuilds false }
 }
+dependencies { implementation 'com.google.zxing:core:3.5.3' }

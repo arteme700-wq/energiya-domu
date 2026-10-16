@@ -39,6 +39,8 @@ public final class MainActivity extends Activity {
     };
     private Prefs prefs;
     private HistoryDb db;
+    private Notifier notifier;
+    private final long startMs = System.currentTimeMillis();
     private BmsReader bms;
     private float u;
 
@@ -64,6 +66,7 @@ public final class MainActivity extends Activity {
                 | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
         prefs = new Prefs(this);
         db = new HistoryDb(this);
+        notifier = new Notifier(this);
         int wpx = Math.max(getResources().getDisplayMetrics().widthPixels, getResources().getDisplayMetrics().heightPixels);
         u = wpx / 1280f;
         setContentView(build());
@@ -140,6 +143,11 @@ public final class MainActivity extends Activity {
             } catch (Exception e) {
                 Log.w(TAG, "poll", e);
             }
+            try {
+                if (!prefs.demo() && !prefs.ip().isEmpty())
+                    notifier.check(snap, snapOkMs, cell, cellMs, !prefs.bmsMac().isEmpty(), startMs);
+                notifier.flush();
+            } catch (Exception e) { Log.w(TAG, "notify", e); }
             bg.postDelayed(this, POLL_MS);
         }
     };
@@ -160,10 +168,10 @@ public final class MainActivity extends Activity {
         Snapshot s = snap;
         boolean invOk = s != null && now - snapOkMs < 60000;
         String t = s == null ? "—" : new SimpleDateFormat("HH:mm", Locale.US).format(new Date(snapOkMs));
-        badge(badgeInv, invOk, (demo ? "демо · " : "") + "логер · " + t);
+        badge(badgeInv, invOk, (demo ? "демо · " : "") + "інвертор");
         JkBmsProtocol.CellInfo ci = cell;
         boolean bmsOk = ci != null && now - cellMs < 60000;
-        badge(badgeBms, bmsOk, (demo ? "демо · " : "") + "BMS · " + (bmsOk ? "BLE" : bmsLink ? "з'єднання" : prefs.bmsMac().isEmpty() ? "не вибрано" : "немає"));
+        badge(badgeBms, bmsOk, "АКБ" + (bmsOk ? "" : bmsLink ? " …" : prefs.bmsMac().isEmpty() ? " не вибрано" : " немає"));
 
         flow.ok = invOk;
         if (invOk) {
@@ -203,7 +211,7 @@ public final class MainActivity extends Activity {
         if (invOk) {
             tPv.setText(val(Main.f(s.todayPv, 1), "кВт·год"));
             tLoad.setText(val(Main.f(s.todayLoad, 1), "кВт·год"));
-            tGrid.setText(Main.f(s.todayImp, 1) + " / " + Main.f(s.todayExp, 1));
+            tGrid.setText(val(Main.f(s.todayImp, 1), "кВт·год"));
             tBatt.setText(Main.f(s.todayChg, 1) + " / " + Main.f(s.todayDis, 1));
             double self = s.todayLoad > 0.1 ? Math.max(0, Math.min(100, 100 * (1 - s.todayImp / s.todayLoad))) : Double.NaN;
             tSelf.setText(val(Main.n0(self), "%"));
@@ -211,16 +219,15 @@ public final class MainActivity extends Activity {
             iState.setText(s.state >= 0 && s.state < st.length ? st[s.state] : "—");
             iState.setTextColor(s.state == 2 ? Views.GRN : s.state >= 3 ? Views.RED : Views.TXT);
             double pct = 100 * s.load / prefs.ratedW();
-            iLoad.setText(val(Main.n0(pct), "% від " + Main.n0(prefs.ratedW() / 1000) + " кВт"));
+            iLoad.setText(val(Main.n0(pct), "%"));
             loadBar.frac = (float) (pct / 100); loadBar.invalidate();
             iTemp.setText(val(Main.n0(s.tempHs) + " / " + Main.n0(s.tempDc), "°C"));
-            SpannableStringBuilder g = val(Main.f(s.gridV, 1), "В"); g.append(" "); g.append(val(Main.f(s.gridHz, 2), "Гц"));
-            iGrid.setText(g);
+            if (s.gridOn()) { iGrid.setText(val(Main.n0(s.gridV), "В")); iGrid.setTextColor(Color.WHITE); } else { iGrid.setText("немає"); iGrid.setTextColor(Views.RED); }
         }
         long[] o = demo ? new long[]{now - 86400000L - 3 * 3600000L, now - 86400000L - 12 * 60000L} : db.lastOutage();
         if (o == null) iOutage.setText("не було");
-        else if (o[1] == 0) { iOutage.setText("триває " + Main.dur((now - o[0]) / 3600000.0)); iOutage.setTextColor(Views.RED); }
-        else { iOutage.setText(dayWord(o[0], now) + " " + Main.dur((o[1] - o[0]) / 3600000.0)); iOutage.setTextColor(Views.TXT); }
+        else if (o[1] == 0) { iOutage.setText("триває " + hm((now - o[0]) / 3600000.0)); iOutage.setTextColor(Views.RED); }
+        else { iOutage.setText(dayWord(o[0], now) + ", " + hm((o[1] - o[0]) / 3600000.0)); iOutage.setTextColor(Color.WHITE); }
 
         // Графіки
         day.d = demo ? Demo.hourly(now) : db.hourly(now);
@@ -244,6 +251,8 @@ public final class MainActivity extends Activity {
         int col = chg ? Views.GRN : 0xFFFB923C;
         battSub.setTextColor(col); socBig.setTextColor(col);
     }
+
+    private static String hm(double h) { int m = (int) Math.round(h * 60); return m / 60 + ":" + String.format(Locale.US, "%02d", m % 60); }
 
     private static String sign(double v) { return v > 0.05 ? "+" : ""; }
 
@@ -285,24 +294,23 @@ public final class MainActivity extends Activity {
 
         // заголовок
         FrameLayout hdr = new FrameLayout(this); hdr.setPadding(px(10), 0, px(10), 0);
-        col.addView(hdr, new LinearLayout.LayoutParams(-1, px(50)));
+        col.addView(hdr, new LinearLayout.LayoutParams(-1, px(62)));
         LinearLayout left = new LinearLayout(this); left.setGravity(Gravity.CENTER_VERTICAL);
-        TextView logo = text("⚡", 20, Color.WHITE); logo.setGravity(Gravity.CENTER);
+        TextView logo = text("⚡", 26, Color.WHITE); logo.setGravity(Gravity.CENTER);
         logo.setBackground(round(0xFF059669, px(5), 0));
-        left.addView(logo, new LinearLayout.LayoutParams(px(32), px(32)));
-        TextView title = text("  Енергія", 23, Color.WHITE); title.setTypeface(Typeface.DEFAULT_BOLD);
+        left.addView(logo, new LinearLayout.LayoutParams(px(40), px(40)));
+        TextView title = text("  Енергія", 30, Color.WHITE); title.setTypeface(Typeface.DEFAULT_BOLD);
         left.addView(title);
-        left.addView(text("   Deye 8 кВт · JK BMS", 16, Views.DIM));
         left.setOnLongClickListener(v -> { startActivity(new Intent(this, SettingsActivity.class)); return true; });
         hdr.addView(left, new FrameLayout.LayoutParams(-2, -1, Gravity.START | Gravity.CENTER_VERTICAL));
-        clock = text("--:--", 32, Views.TXT);
+        clock = text("--:--", 46, Views.TXT);
         clock.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
         clock.setLetterSpacing(0.08f);
         hdr.addView(clock, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
         LinearLayout right = new LinearLayout(this); right.setGravity(Gravity.CENTER_VERTICAL);
         badgeInv = badgeView(); badgeBms = badgeView();
         right.addView(badgeInv); right.addView(badgeBms);
-        TextView gear = text("  ⚙", 24, Views.GRY);
+        TextView gear = text("   ⚙", 36, Views.GRY);
         gear.setOnClickListener(v -> startActivity(new Intent(this, SettingsActivity.class)));
         right.addView(gear);
         hdr.addView(right, new FrameLayout.LayoutParams(-2, -1, Gravity.END | Gravity.CENTER_VERTICAL));
@@ -338,11 +346,12 @@ public final class MainActivity extends Activity {
 
         // 3 сьогодні
         LinearLayout c3 = card(r1, "Сьогодні", 0xFFFBBF24);
-        tPv = kv(c3, "☀ Вироблено");
-        tLoad = kv(c3, "🏠 Спожито");
-        tGrid = kv(c3, "🔌 З мережі / в мережу");
-        tBatt = kv(c3, "🔋 Заряд / розряд");
-        tSelf = kv(c3, "Власне покриття"); tSelf.setTextColor(Views.GRN);
+        tPv = kv(c3, "Вироблено"); tPv.setTextColor(Views.YEL);
+        tLoad = kv(c3, "Спожито"); tLoad.setTextColor(Views.PUR);
+        tGrid = kv(c3, "З мережі"); tGrid.setTextColor(Views.BLU);
+        LinearLayout more3 = new LinearLayout(this); more3.setOrientation(LinearLayout.VERTICAL); // для детальної картки
+        tBatt = kv(more3, "Заряд / розряд");
+        tSelf = kv(more3, "Власне покриття");
 
         // 4 графік дня
         LinearLayout c4 = card(r2, "Графік дня", Views.YEL);
@@ -353,23 +362,24 @@ public final class MainActivity extends Activity {
         LinearLayout c5 = card(r2, "Інвертор", Views.BLU);
         iState = kv(c5, "Стан");
         iLoad = kv(c5, "Навантаження");
+        iGrid = kv(c5, "Мережа");
+        iOutage = kv(c5, "Відключення");
+        LinearLayout more5 = new LinearLayout(this); more5.setOrientation(LinearLayout.VERTICAL); // для детальної картки
         loadBar = new Views.Bar(this, Views.BLU);
         LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(-1, px(8)); blp.setMargins(0, px(4), 0, px(4));
-        c5.addView(loadBar, blp);
-        iTemp = kv(c5, "Темп. радіатор / DC");
-        iGrid = kv(c5, "Мережа");
-        iOutage = kv(c5, "Останнє відключення");
+        more5.addView(loadBar, blp);
+        iTemp = kv(more5, "Темп. радіатор / DC");
 
         // 6 тиждень
         LinearLayout c6 = card(r2, "Тиждень", Views.PUR);
         week = new Views.WeekChart(this, u); c6.addView(week, new LinearLayout.LayoutParams(-1, 0, 1));
-        weekAvg = text("", 15, Views.GRY);
-        c6.addView(legend(new String[]{"СЕС", "Спожито"}, new int[]{Views.YEL, Views.PUR}, weekAvg));
+        weekAvg = text("", 20, Views.GRY);
+        c6.addView(legend(new String[]{"СЕС", "Спожито"}, new int[]{Views.YEL, Views.PUR}, null));
         return root;
     }
 
     private TextView badgeView() {
-        TextView t = text("", 15, Views.GRN);
+        TextView t = text("", 21, Views.GRN);
         t.setPadding(px(9), px(3), px(9), px(3));
         t.setBackground(round(0, px(5), 0xFF334155));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2); lp.setMargins(px(6), 0, 0, 0);
@@ -389,8 +399,8 @@ public final class MainActivity extends Activity {
         c.setBackground(round(0xD9020617, px(6), 0x2694A3B8));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -1, 1); lp.setMargins(px(2), px(2), px(2), px(2));
         row.addView(c, lp);
-        TextView t = text(title.toUpperCase(new Locale("uk")), 15, color);
-        t.setTypeface(Typeface.DEFAULT_BOLD); t.setLetterSpacing(0.15f); t.setGravity(Gravity.CENTER);
+        TextView t = text(title.toUpperCase(new Locale("uk")), 22, color);
+        t.setTypeface(Typeface.DEFAULT_BOLD); t.setLetterSpacing(0.06f); t.setGravity(Gravity.CENTER);
         t.setPadding(0, 0, 0, px(4));
         c.addView(t, new LinearLayout.LayoutParams(-1, -2));
         return c;
@@ -400,10 +410,10 @@ public final class MainActivity extends Activity {
 
     private TextView kv(LinearLayout card, String label, TextView lbl) {
         LinearLayout r = new LinearLayout(this); r.setGravity(Gravity.CENTER_VERTICAL);
-        r.setPadding(px(2), px(5), px(2), px(5));
-        lbl.setText(label); lbl.setTextSize(0, px(18)); lbl.setTextColor(Views.GRY);
+        r.setPadding(px(2), px(9), px(2), px(9));
+        lbl.setText(label); lbl.setTextSize(0, px(24)); lbl.setTextColor(0xFFCBD5E1);
         r.addView(lbl, new LinearLayout.LayoutParams(0, -2, 1));
-        TextView v = text("—", 26, Views.TXT); v.setTypeface(Typeface.DEFAULT_BOLD); v.setGravity(Gravity.END);
+        TextView v = text("—", 40, Color.WHITE); v.setTypeface(Typeface.DEFAULT_BOLD); v.setGravity(Gravity.END);
         r.addView(v);
         card.addView(r, new LinearLayout.LayoutParams(-1, -2));
         View line = new View(this); line.setBackgroundColor(0x1A94A3B8);
@@ -415,9 +425,9 @@ public final class MainActivity extends Activity {
         LinearLayout l = new LinearLayout(this); l.setGravity(Gravity.CENTER);
         for (int i = 0; i < names.length; i++) {
             View sw = new View(this); sw.setBackgroundColor(cols[i]);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(px(16), px(4)); lp.setMargins(px(12), 0, px(6), 0);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(px(22), px(6)); lp.setMargins(px(16), 0, px(8), 0);
             l.addView(sw, lp);
-            l.addView(text(names[i], 15, Views.GRY));
+            l.addView(text(names[i], 22, 0xFFCBD5E1));
         }
         if (extra != null) { extra.setPadding(px(20), 0, 0, 0); l.addView(extra); }
         return l;

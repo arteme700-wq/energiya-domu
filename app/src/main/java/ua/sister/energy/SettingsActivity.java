@@ -32,7 +32,8 @@ import java.util.Locale;
 public final class SettingsActivity extends Activity {
     private Prefs prefs;
     private EditText ip, port, serial, slave, rated, cap, upd;
-    private CheckBox demo;
+    private CheckBox demo, ntfyOn;
+    private EditText socMin;
     private TextView bmsSel, status;
     private String bmsMac, bmsName;
     private final LinkedHashMap<String, String> found = new LinkedHashMap<>();
@@ -66,6 +67,23 @@ public final class SettingsActivity extends Activity {
         ListView lv = new ListView(this); lv.setAdapter(adapter);
         lv.setOnItemClickListener((p, v, pos, id) -> { bmsMac = macs.get(pos); bmsName = found.get(bmsMac); showBms(); });
         l.addView(lv, new LinearLayout.LayoutParams(-1, 360));
+        title(l, "Сповіщення на телефон (ntfy.sh)");
+        final Notifier nf = new Notifier(this);
+        ntfyOn = new CheckBox(this); ntfyOn.setText("Надсилати сповіщення"); ntfyOn.setTextSize(18); ntfyOn.setChecked(nf.enabled()); l.addView(ntfyOn);
+        socMin = field(l, "Поріг низького заряду АКБ, %", String.valueOf(nf.socThreshold()), InputType.TYPE_CLASS_NUMBER);
+        TextView tp = new TextView(this); tp.setTextSize(18); tp.setText("Код для телефона:\n" + nf.topic()); tp.setTextIsSelectable(true); l.addView(tp);
+        TextView hint = new TextView(this); hint.setTextSize(15); hint.setText("Відскануйте QR у застосунку «Енергія — сповіщення» на телефоні або введіть код вручну."); l.addView(hint);
+        QrView qr = new QrView(this); qr.setText(Notifier.pairUrl(nf.topic()));
+        l.addView(qr, new LinearLayout.LayoutParams(420, 420));
+        Button tst = new Button(this); tst.setText("Надіслати тестове сповіщення"); l.addView(tst);
+        tst.setOnClickListener(v -> { status.setText("Надсилаю…"); new Thread(() -> {
+            String r;
+            try { Notifier.post(nf.topic(), new org.json.JSONObject().put("title", "🔔 Тест: Енергія дому").put("message", "Сповіщення працюють. Цей планшет надсилатиме події про світло та АКБ.").put("priority", 4)); r = "Тестове сповіщення надіслано"; }
+            catch (Exception e) { r = "Не вдалося: " + e.getMessage(); }
+            final String rr = r; h.post(() -> status.setText(rr)); }).start(); });
+        Button rg = new Button(this); rg.setText("Створити новий код (старі телефони перестануть отримувати)"); l.addView(rg);
+        rg.setOnLongClickListener(v -> { nf.regenerate(); recreate(); return true; });
+        rg.setOnClickListener(v -> status.setText("Утримуйте кнопку, щоб змінити код"));
         title(l, "Оновлення (версія " + BuildConfig.VERSION_NAME + (Updater.isOwner(this) ? ", тихе встановлення" : "") + ")");
         upd = field(l, "Адреса перевірки (порожньо = GitHub)", prefs.updateUrl().equals(Updater.DEFAULT_URL) ? "" : prefs.updateUrl(), InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         Button chk = new Button(this); chk.setText("Перевірити оновлення зараз"); l.addView(chk);
@@ -100,6 +118,7 @@ public final class SettingsActivity extends Activity {
                 .putInt("port", num(port, 8899)).putInt("slave", num(slave, 1)).putFloat("rated", num(rated, 8000)).putFloat("cap_ah", num(cap, 420))
                 .putString("update_url", upd.getText().toString().trim()).putBoolean("demo", demo.isChecked()).putString("bms_mac", bmsMac).putString("bms_name", bmsName == null ? "" : bmsName)
                 .apply();
+        new Notifier(this).edit().putBoolean("enabled", ntfyOn.isChecked()).putInt("soc_min", Math.max(5, Math.min(90, num(socMin, 20)))).apply();
     }
 
     private void testLogger() {

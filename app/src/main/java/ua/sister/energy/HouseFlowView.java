@@ -177,19 +177,19 @@ final class HouseFlowView extends View {
 
     private void drawLabels(Canvas c) {
         double pv = pv1 + pv2;
-        label(c, 8, 30, 34, 120, ok ? (gridOn ? Main.w(Math.abs(grid)) : "немає світла") : "—",
-                !gridOn ? "Мережа" : grid < -20 ? "Мережа · віддає" : "Мережа", !gridOn ? Views.RED : Views.BLU);
-        label(c, 196, 30, 262, 100, ok ? Main.w(pv) : "—", pv2 > 20 ? "СЕС · PV1+PV2" : "СЕС", Views.YEL);
-        label(c, 70, 270, 160, 214, ok ? Main.w(load) : "—", gen > 20 ? "Дім · ГЕН " + Main.w(gen) : "Дім", Views.PUR);
-        String bt = ok ? Main.w(Math.abs(batt)) + (soc >= 0 ? "  " + soc + "%" : "") : "—";
-        label(c, 270, 270, 296, 252, bt, batt < -20 ? "АКБ · заряд" : batt > 20 ? "АКБ · розряд" : "АКБ", batt > 20 ? 0xFFFB923C : Views.GRN);
+        label(c, 4, 34, 34, 120, ok ? (gridOn ? Main.w(Math.abs(grid)) : "немає світла") : "—",
+                "Мережа", !gridOn ? Views.RED : Views.BLU);
+        label(c, 200, 34, 262, 100, ok ? Main.w(pv) : "—", "Сонце", Views.YEL);
+        label(c, 62, 268, 160, 214, ok ? Main.w(load) : "—", gen > 20 ? "Дім + ГЕН" : "Дім", Views.PUR);
+        String bt = ok ? Main.w(Math.abs(batt)) : "—";
+        label(c, 268, 268, 296, 252, bt, "АКБ", batt > 20 ? 0xFFFB923C : Views.GRN);
     }
 
     private void label(Canvas c, float x, float y, float lx, float ly, String val, String name, int color) {
         c.drawLine(x + 2, y + 6, lx, ly, lead);
-        txt.setTextSize(19); txt.setFakeBoldText(true); txt.setColor(color);
+        txt.setTextSize(30); txt.setFakeBoldText(true); txt.setColor(color);
         c.drawText(val, x, y - 2, txt);
-        txt.setTextSize(13); txt.setFakeBoldText(false); txt.setColor(Views.GRY);
-        c.drawText(name, x, y + 14, txt);
+        txt.setTextSize(21); txt.setFakeBoldText(false); txt.setColor(0xFFCBD5E1);
+        c.drawText(name, x, y + 20, txt);
     }
 }
