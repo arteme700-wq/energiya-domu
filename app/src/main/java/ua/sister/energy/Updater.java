@@ -12,7 +12,6 @@ import android.content.pm.PackageManager;
 import android.content.pm.Signature;
 import android.util.Log;
 
-import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
@@ -28,12 +27,12 @@ import java.security.MessageDigest;
 import java.util.Arrays;
 
 /**
- * Самооновлення з GitHub Releases. Реліз містить version.json {"versionCode","versionName","sha256"} і APK.
+ * Самооновлення з GitHub Releases. Реліз містить version.json {"versionCode","versionName","sha256","apk"} і APK (energiya-domu.apk).
  * Встановлюється лише APK з тим самим сертифікатом підпису і правильним SHA-256.
  * Тихо — якщо додаток є власником пристрою; інакше Android покаже звичайний запит.
  */
 public final class Updater {
-    public static final String DEFAULT_URL = "https://api.github.com/repos/arteme700-wq/energiya-domu/releases/latest";
+    public static final String DEFAULT_URL = "https://github.com/arteme700-wq/energiya-domu/releases/latest/download/";
     private static final String TAG = "Updater";
     static final String ACTION = "ua.sister.energy.INSTALL_STATUS";
 
@@ -42,18 +41,11 @@ public final class Updater {
     /** @return текст результату (для налаштувань / журналу). Виконувати не в UI-потоці. */
     public static synchronized String check(Context ctx) {
         try {
-            String url = new Prefs(ctx).updateUrl();
-            JSONObject rel = new JSONObject(new String(get(url, 1 << 20), "UTF-8"));
-            JSONArray assets = rel.getJSONArray("assets");
-            String apkUrl = null, verUrl = null;
-            for (int i = 0; i < assets.length(); i++) {
-                JSONObject a = assets.getJSONObject(i);
-                String n = a.getString("name");
-                if (n.endsWith(".apk")) apkUrl = a.getString("browser_download_url");
-                if (n.equals("version.json")) verUrl = a.getString("browser_download_url");
-            }
-            if (apkUrl == null || verUrl == null) return "У релізі немає APK або version.json";
-            JSONObject ver = new JSONObject(new String(get(verUrl, 64 << 10), "UTF-8"));
+            String base = new Prefs(ctx).updateUrl();
+            if (!base.endsWith("/")) base += "/";
+            // github.com/…/releases/latest/download/<файл> — без API і без лімітів запитів
+            JSONObject ver = new JSONObject(new String(get(base + "version.json", 64 << 10), "UTF-8"));
+            String apkUrl = base + ver.optString("apk", "energiya-domu.apk");
             int code = ver.getInt("versionCode");
             String name = ver.optString("versionName", String.valueOf(code));
             if (code <= BuildConfig.VERSION_CODE) return "Остання версія вже встановлена (" + BuildConfig.VERSION_NAME + ")";
