@@ -1,0 +1,14 @@
+# збірка
+build/
+.gradle/
+*.apk
+*.aab
+# локальне / секрети
+local.properties
+*.jks
+*.keystore
+keystore.properties
+keystore/
+.idea/
+*.iml
+.DS_Store
