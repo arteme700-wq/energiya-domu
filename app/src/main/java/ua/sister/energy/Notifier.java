@@ -52,6 +52,10 @@ public final class Notifier {
 
     public static String pairUrl(String topic) { return SERVER + "/" + topic; }
 
+    /** Сторінка встановлення телефонного додатка; код — у фрагменті (#), тому не потрапляє на сервер. */
+    public static final String PAGE = "https://arteme700-wq.github.io/energiya-domu/p/#";
+    public static String pageUrl(String topic) { return PAGE + topic; }
+
     /** Ставить подію в чергу (з дедуплікацією). priority: 1..5 (ntfy). */
     public synchronized void event(String key, String title, String msg, int priority, String tag) {
         if (!enabled()) return;

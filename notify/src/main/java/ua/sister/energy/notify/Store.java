@@ -19,10 +19,16 @@ final class Store {
     String status() { return p.getString("status", "—"); }
     void setStatus(String s) { p.edit().putString("status", s).apply(); }
 
-    /** Приймає QR-вміст (https://ntfy.sh/тема) або сам код. @return тема або null. */
+    /** Приймає QR-вміст (https://ntfy.sh/тема, сторінку …/p/#тема, energiya://pair?topic=тема) або сам код. @return тема або null. */
     static String parseTopic(String s) {
         if (s == null) return null;
         s = s.trim();
+        if (s.startsWith("energiya:")) {
+            android.net.Uri u = android.net.Uri.parse(s);
+            s = u.getQueryParameter("topic");
+            return s != null && s.matches("[A-Za-z0-9_-]{8,64}") ? s : null;
+        }
+        int h = s.indexOf('#'); if (h >= 0) s = s.substring(h + 1);
         int q = s.indexOf('?'); if (q >= 0) s = s.substring(0, q);
         while (s.endsWith("/")) s = s.substring(0, s.length() - 1);
         int sl = s.lastIndexOf('/'); if (sl >= 0) s = s.substring(sl + 1);

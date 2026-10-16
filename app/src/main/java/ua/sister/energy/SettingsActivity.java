@@ -72,8 +72,8 @@ public final class SettingsActivity extends Activity {
         ntfyOn = new CheckBox(this); ntfyOn.setText("Надсилати сповіщення"); ntfyOn.setTextSize(18); ntfyOn.setChecked(nf.enabled()); l.addView(ntfyOn);
         socMin = field(l, "Поріг низького заряду АКБ, %", String.valueOf(nf.socThreshold()), InputType.TYPE_CLASS_NUMBER);
         TextView tp = new TextView(this); tp.setTextSize(18); tp.setText("Код для телефона:\n" + nf.topic()); tp.setTextIsSelectable(true); l.addView(tp);
-        TextView hint = new TextView(this); hint.setTextSize(15); hint.setText("Відскануйте QR у застосунку «Енергія — сповіщення» на телефоні або введіть код вручну."); l.addView(hint);
-        QrView qr = new QrView(this); qr.setText(Notifier.pairUrl(nf.topic()));
+        TextView hint = new TextView(this); hint.setTextSize(15); hint.setText("Відскануйте QR камерою телефона — відкриється сторінка: «1. Завантажити додаток», потім «2. Підключити». Якщо додаток уже є — скануйте в ньому або введіть код вручну."); l.addView(hint);
+        QrView qr = new QrView(this); qr.setText(Notifier.pageUrl(nf.topic()));
         l.addView(qr, new LinearLayout.LayoutParams(420, 420));
         Button tst = new Button(this); tst.setText("Надіслати тестове сповіщення"); l.addView(tst);
         tst.setOnClickListener(v -> { status.setText("Надсилаю…"); new Thread(() -> {

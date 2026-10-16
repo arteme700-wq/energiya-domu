@@ -52,6 +52,23 @@ public final class MainActivity extends Activity {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 2);
         ListenService.start(this);
         new Thread(() -> { String r = Updater.check(this, false); android.util.Log.i("Updater", r); }).start();
+        handleLink(getIntent());
+    }
+
+    @Override protected void onNewIntent(Intent i) { super.onNewIntent(i); setIntent(i); handleLink(i); }
+
+    /** Посилання energiya://pair?topic=… зі сторінки підключення. Будь-який сайт може відкрити таке посилання, тому завжди питаємо. */
+    private void handleLink(Intent i) {
+        if (i == null || !Intent.ACTION_VIEW.equals(i.getAction()) || i.getData() == null) return;
+        android.net.Uri u = i.getData();
+        i.setData(null);
+        String t = "pair".equals(u.getHost()) ? Store.parseTopic(u.toString()) : null;
+        if (t == null) { Toast.makeText(this, "Невірне посилання підключення", Toast.LENGTH_LONG).show(); return; }
+        if (t.equals(st.topic())) { Toast.makeText(this, "Цей планшет уже підключено", Toast.LENGTH_LONG).show(); return; }
+        TextView msg = Ui.text(this, "Отримувати сповіщення з планшета «Енергія дому»?\n\nКод: " + t, 22, 0xFFE2E8F0, false);
+        msg.setPadding(48, 32, 48, 0);
+        new AlertDialog.Builder(this).setTitle("Підключити планшет").setView(msg)
+                .setPositiveButton("Підключити", (d, w) -> pair(t)).setNegativeButton("Скасувати", null).show();
     }
 
     private TextView add(LinearLayout l, TextView v) {

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Енергія дому — сповіщення на телефон</title>
+<style>
+  body{margin:0;font-family:Roboto,"Noto Sans",sans-serif;background:#0b1220;color:#f1f5f9;font-size:24px;line-height:1.45}
+  main{max-width:640px;margin:0 auto;padding:24px 20px 40px}
+  h1{font-size:34px;margin:8px 0 6px}
+  .sub{color:#94a3b8;font-size:21px;margin:0 0 22px}
+  .step{background:#111a2e;border:1px solid #1f2b45;border-radius:16px;padding:20px;margin:18px 0}
+  .btn{display:block;text-align:center;text-decoration:none;color:#fff;font-weight:bold;font-size:30px;padding:26px 14px;border-radius:14px}
+  .b1{background:#059669}.b2{background:#2563eb}
+  .hint{font-size:21px;color:#cbd5e1;margin:14px 0 0}
+  .hint b{color:#fff}
+  .code{font-family:monospace;font-size:19px;color:#94a3b8;word-break:break-all;margin-top:14px}
+  .err{background:#3b1d1d;border:1px solid #7f1d1d;border-radius:14px;padding:18px;display:none}
+  a.alt{color:#93c5fd;font-size:21px;display:inline-block;margin-top:12px}
+</style>
+</head>
+<body>
+<main>
+  <h1>⚡ Енергія дому</h1>
+  <p class="sub">Сповіщення з планшета про світло і акумулятор — на цей телефон.</p>
+
+  <div class="err" id="err">Код планшета не знайдено. Відскануйте QR-код ще раз (на планшеті: ⚙ → Сповіщення).</div>
+
+  <div class="step">
+    <a class="btn b1" id="dl" href="https://github.com/arteme700-wq/energiya-domu/releases/latest/download/energiya-notify.apk">1. Завантажити додаток</a>
+    <p class="hint">Після завантаження натисніть на файл <b>energiya-notify.apk</b>. Якщо телефон попросить — <b>дозвольте встановлення з цього джерела</b> («Невідомі джерела»), потім натисніть <b>«Встановити»</b>.</p>
+  </div>
+
+  <div class="step">
+    <a class="btn b2" id="pair" href="#">2. Підключити</a>
+    <p class="hint">Натисніть, коли додаток уже встановлено. Відкриється «Енергія — сповіщення» і запитає, чи підключити цей планшет.</p>
+    <a class="alt" id="alt" href="#">Не відкрилось? Натисніть тут</a>
+    <div class="code" id="code"></div>
+  </div>
+</main>
+<script>
+(function () {
+  // Код у фрагменті (#...) — він не надсилається на сервер.
+  var t = decodeURIComponent((location.hash || "").replace(/^#/, "")).trim();
+  if (!/^[A-Za-z0-9_-]{8,64}$/.test(t)) {
+    document.getElementById("err").style.display = "block";
+    document.getElementById("pair").style.opacity = "0.4";
+    document.getElementById("pair").removeAttribute("href");
+    document.getElementById("alt").style.display = "none";
+    return;
+  }
+  var q = "pair?topic=" + encodeURIComponent(t);
+  document.getElementById("pair").href =
+    "intent://" + q + "#Intent;scheme=energiya;package=ua.sister.energy.notify;end";
+  document.getElementById("alt").href = "energiya://" + q;
+  document.getElementById("code").textContent = "Код: " + t;
+})();
+</script>
+</body>
+</html>
