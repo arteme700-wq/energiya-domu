@@ -23,6 +23,11 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.HOME"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
         </activity>
         <activity android:name=".SettingsActivity" android:exported="false"
             android:screenOrientation="sensorLandscape" android:theme="@android:style/Theme.Material" android:windowSoftInputMode="stateHidden"/>

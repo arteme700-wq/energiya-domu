@@ -92,10 +92,21 @@ public final class SettingsActivity extends Activity {
         Button chk = new Button(this); chk.setText("Перевірити оновлення зараз"); l.addView(chk);
         chk.setOnClickListener(v -> { save(); status.setText("Перевіряю оновлення…"); new Thread(() -> { String r = Updater.check(this); h.post(() -> status.setText(r)); }).start(); });
         status = new TextView(this); status.setTextSize(16); l.addView(status);
+        title(l, "Домашній екран");
+        TextView hs = new TextView(this); hs.setTextSize(17); l.addView(hs);
+        Button hb = new Button(this); l.addView(hb);
+        Runnable hr = () -> {
+            boolean on = Home.wanted(this) && Updater.isOwner(this);
+            hs.setText(on ? "«Енергія» закріплена як домашній екран. Налаштування Android — через шторку сповіщень (проведіть зверху вниз)."
+                    : Home.wanted(this) ? "Закріплення працює лише в режимі власника пристрою." : "Закріплення вимкнене — кнопка «Додому» може запитати, який екран відкрити.");
+            hb.setText(Home.wanted(this) ? "Прибрати закріплення домашнього екрана" : "Зробити «Енергію» домашнім екраном");
+        };
+        hr.run();
+        hb.setOnClickListener(v -> { if (Home.wanted(this)) Home.clear(this); else Home.enable(this); hr.run(); });
         Button save = new Button(this); save.setText("Зберегти і повернутись"); l.addView(save);
         save.setOnClickListener(v -> { save(); finish(); });
         TextView note = new TextView(this); note.setTextSize(14);
-        note.setText("Відкрити налаштування: значок ⚙ або довге натискання на «Енергія».\nДодаток лише читає дані: інвертор (Modbus 0x03) і BMS (запити стану). Жодних команд керування.");
+        note.setText("Відкрити налаштування: значок ⚙.\nДодаток лише читає дані: інвертор (Modbus 0x03) і BMS (запити стану). Жодних команд керування.");
         l.addView(note);
         ScrollView sv = new ScrollView(this); sv.addView(l);
         setContentView(sv);

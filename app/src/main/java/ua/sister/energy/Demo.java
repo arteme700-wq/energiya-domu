@@ -51,15 +51,29 @@ final class Demo {
         return ci;
     }
 
-    static double[][] hourly(long now) {
+    static double[][] hourly(long now) { return hourly(now, 0); }
+
+    static double[][] hourly(long now, int back) {
         Calendar c = Calendar.getInstance(); c.setTimeInMillis(now);
-        int H = c.get(Calendar.HOUR_OF_DAY);
+        int H = back > 0 ? 23 : c.get(Calendar.HOUR_OF_DAY);
         double[][] r = new double[3][24];
         for (int i = 0; i < 24; i++) {
             if (i > H) { r[0][i] = r[1][i] = r[2][i] = Double.NaN; continue; }
             double p = 4.3 * sun(i + 0.5), l = houseKw(i + 0.5), su = p - l;
             double b = su > 0 ? Math.min(su, 9.7) : -Math.min(-su * 0.9, 9.7);
             r[0][i] = p; r[1][i] = l; r[2][i] = Math.max(0, l - p + b);
+        }
+        return r;
+    }
+
+    static Object[][] days(long now, int n, Snapshot today) {
+        if (n == 7) return week(now, today);
+        Object[][] r = new Object[n][3];
+        for (int i = 0; i < n; i++) {
+            r[i][0] = now - (n - 1 - i) * 86400000L;
+            double k = 0.55 + 0.45 * Math.abs(Math.sin(i * 1.7));
+            r[i][1] = i < n - 1 ? 22.0 * k : today.todayPv;
+            r[i][2] = i < n - 1 ? 11.5 + 2.5 * Math.sin(i * 0.9) : today.todayLoad;
         }
         return r;
     }

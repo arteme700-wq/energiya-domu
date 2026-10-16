@@ -37,15 +37,16 @@ public final class MainActivity extends Activity {
     private final Runnable updateTask = new Runnable() {
         @Override public void run() { Log.i(TAG, "update: " + Updater.check(MainActivity.this)); upd.postDelayed(this, 6 * 3600 * 1000L); }
     };
-    private Prefs prefs;
-    private HistoryDb db;
+    Prefs prefs;
+    HistoryDb db;
+    private Popups popups;
     private Notifier notifier;
     private final long startMs = System.currentTimeMillis();
     private BmsReader bms;
     private float u;
 
     private volatile Snapshot snap;
-    private volatile long snapOkMs;
+    volatile long snapOkMs;
     private volatile JkBmsProtocol.CellInfo cell;
     private volatile long cellMs;
     private volatile boolean bmsLink;
@@ -62,6 +63,8 @@ public final class MainActivity extends Activity {
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
+        Home.installCrashGuard(this);
+        Home.apply(this);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
                 | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
         prefs = new Prefs(this);
@@ -109,7 +112,14 @@ public final class MainActivity extends Activity {
 
     @Override public void onWindowFocusChanged(boolean f) { super.onWindowFocusChanged(f); if (f) immersive(); }
 
-    @Override public void onBackPressed() { /* кіоск: назад не закриває */ }
+    /** Головний екран — домашній: «Назад» лише закриває детальну картку. */
+    @Override public void onBackPressed() { if (popups != null && popups.isOpen()) popups.close(); }
+
+    @Override protected void onNewIntent(Intent i) { super.onNewIntent(i); if (popups != null) popups.close(); } // кнопка «Додому»
+
+    Snapshot snapOk() { Snapshot s = snap; return s != null && System.currentTimeMillis() - snapOkMs < 60000 ? s : null; }
+
+    JkBmsProtocol.CellInfo cellOk() { JkBmsProtocol.CellInfo c = cell; return c != null && System.currentTimeMillis() - cellMs < 60000 ? c : null; }
 
     private void immersive() {
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN
@@ -237,6 +247,7 @@ public final class MainActivity extends Activity {
         for (Object[] r : week.d) if ((Double) r[2] > 0) { sum += (Double) r[2]; n++; }
         weekAvg.setText(n == 0 ? "" : "сер. " + Main.f(sum / n, 1) + " кВт·год/добу");
         week.invalidate();
+        popups.refresh();
     }
 
     /** Струм АКБ зі стрілкою: ▲ заряд (зелений), ▼ розряд (помаранчевий). */
@@ -334,7 +345,6 @@ public final class MainActivity extends Activity {
         battSub.setPadding(0, px(10), 0, 0);
         mid.addView(socBig); mid.addView(battSub);
         c2.addView(mid, new LinearLayout.LayoutParams(-1, 0, 1));
-        c2.setOnClickListener(v -> android.widget.Toast.makeText(this, "Детальна картка АКБ — у наступній версії", android.widget.Toast.LENGTH_SHORT).show());
         // поза розміткою (дані оновлюються, показ — у детальній картці)
         socBar = new Views.Bar(this, 0xFF10B981);
         cellsView = new Views.Cells(this);
@@ -372,6 +382,9 @@ public final class MainActivity extends Activity {
 
         // 6 тиждень
         LinearLayout c6 = card(r2, "Тиждень", Views.PUR);
+        popups = new Popups(this, root, u);
+        LinearLayout[] cs = {c1, c2, c3, c4, c5, c6};
+        for (int i = 0; i < cs.length; i++) { final int k = i + 1; cs[i].setOnClickListener(v -> popups.show(k)); }
         week = new Views.WeekChart(this, u); c6.addView(week, new LinearLayout.LayoutParams(-1, 0, 1));
         weekAvg = text("", 20, Views.GRY);
         c6.addView(legend(new String[]{"СЕС", "Спожито"}, new int[]{Views.YEL, Views.PUR}, null));

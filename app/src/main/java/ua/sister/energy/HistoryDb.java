@@ -42,15 +42,19 @@ public final class HistoryDb extends SQLiteOpenHelper {
     private static double nz(double v) { return Double.isNaN(v) ? 0 : v; }
 
     /** [3][24]: середні кВт по годинах сьогодні (pv, load, grid-імпорт); NaN = немає даних. */
-    public double[][] hourly(long now) {
+    public double[][] hourly(long now) { return hourly(now, 0); }
+
+    /** Те саме для дня зі зсувом (0 = сьогодні, 1 = вчора). */
+    public double[][] hourly(long now, int back) {
         double[][] r = new double[3][24];
         for (double[] a : r) java.util.Arrays.fill(a, Double.NaN);
         Calendar c = Calendar.getInstance(); c.setTimeInMillis(now);
         c.set(Calendar.HOUR_OF_DAY, 0); c.set(Calendar.MINUTE, 0); c.set(Calendar.SECOND, 0);
+        c.add(Calendar.DAY_OF_MONTH, -back);
         long t0 = c.getTimeInMillis() / 1000;
         try (Cursor q = getReadableDatabase().rawQuery(
-                "SELECT (ts-?)/3600 h, AVG(pv), AVG(load), AVG(MAX(grid,0)) FROM samples WHERE ts>=? GROUP BY h",
-                new String[]{String.valueOf(t0), String.valueOf(t0)})) {
+                "SELECT (ts-?)/3600 h, AVG(pv), AVG(load), AVG(MAX(grid,0)) FROM samples WHERE ts>=? AND ts<? GROUP BY h",
+                new String[]{String.valueOf(t0), String.valueOf(t0), String.valueOf(t0 + 86400)})) {
             while (q.moveToNext()) {
                 int h = q.getInt(0);
                 if (h < 0 || h > 23) continue;
@@ -61,10 +65,13 @@ public final class HistoryDb extends SQLiteOpenHelper {
     }
 
     /** Останні 7 днів: {day, pv, load}. */
-    public Object[][] week(long now) {
-        Object[][] r = new Object[7][3];
-        for (int i = 0; i < 7; i++) {
-            long t = now - (6 - i) * 86400000L;
+    public Object[][] week(long now) { return days(now, 7); }
+
+    /** Останні n днів: {day, pv, load}. */
+    public Object[][] days(long now, int n) {
+        Object[][] r = new Object[n][3];
+        for (int i = 0; i < n; i++) {
+            long t = now - (n - 1 - i) * 86400000L;
             String d = day(t);
             r[i][0] = t; r[i][1] = 0.0; r[i][2] = 0.0;
             try (Cursor q = getReadableDatabase().rawQuery("SELECT pv,load FROM daily WHERE day=?", new String[]{d})) {
@@ -86,5 +93,23 @@ public final class HistoryDb extends SQLiteOpenHelper {
             if (q.moveToNext()) return new long[]{q.getLong(0) * 1000, q.getLong(1) * 1000};
         }
         return null;
+    }
+
+    /** {pv, load, imp, exp, chg, dis} за день або null. */
+    public double[] dayRow(String d) {
+        try (Cursor q = getReadableDatabase().rawQuery("SELECT pv,load,imp,exp,chg,dis FROM daily WHERE day=?", new String[]{d})) {
+            if (q.moveToNext()) { double[] r = new double[6]; for (int i = 0; i < 6; i++) r[i] = q.getDouble(i); return r; }
+        }
+        return null;
+    }
+
+    /** Відключення з моменту since: список {start, end(0=триває)}, новіші першими. */
+    public java.util.List<long[]> outages(long since) {
+        java.util.List<long[]> r = new java.util.ArrayList<>();
+        try (Cursor q = getReadableDatabase().rawQuery("SELECT start, IFNULL(end,0) FROM outages WHERE start>=? OR end IS NULL ORDER BY start DESC LIMIT 20",
+                new String[]{String.valueOf(since / 1000)})) {
+            while (q.moveToNext()) r.add(new long[]{q.getLong(0) * 1000, q.getLong(1) * 1000});
+        }
+        return r;
     }
 }

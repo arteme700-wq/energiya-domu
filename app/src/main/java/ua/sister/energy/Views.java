@@ -85,16 +85,26 @@ final class Views {
     /** Напруги банок. */
     static final class Cells extends View {
         double[] v = new double[0];
+        float labels; // >0: розмір підписів (напруга зверху, номер знизу)
         Cells(Context c) { super(c); }
         @Override protected void onDraw(Canvas c) {
             if (v.length == 0) return;
             double mn = 9, mx = 0;
             for (double x : v) { mn = Math.min(mn, x); mx = Math.max(mx, x); }
-            float w = getWidth(), h = getHeight(), gap = 3, bw = (w - gap * (v.length - 1)) / v.length;
+            float top = labels > 0 ? labels * 1.4f : 0, bot = labels > 0 ? labels * 1.4f : 0;
+            float w = getWidth(), h = getHeight() - top - bot, gap = labels > 0 ? labels * 0.5f : 3, bw = (w - gap * (v.length - 1)) / v.length;
+            Paint tp = paint(0xFFE2E8F0, labels * 0.9f); tp.setTextAlign(Paint.Align.CENTER);
+            Paint np = paint(GRY, labels * 0.9f); np.setTextAlign(Paint.Align.CENTER);
             for (int i = 0; i < v.length; i++) {
                 float fr = (float) (mx - mn < 0.002 ? 0.9 : 0.55 + 0.45 * (v[i] - mn) / (mx - mn));
-                int col = v[i] == mx && mx - mn > 0.03 ? YEL : v[i] == mn && mx - mn > 0.03 ? BLU : 0xFF10B981;
-                c.drawRoundRect(i * (bw + gap), h * (1 - fr), i * (bw + gap) + bw, h, 2, 2, paint(col, 0));
+                int col = v[i] == mx && mx - mn > 0.003 ? YEL : v[i] == mn && mx - mn > 0.003 ? BLU : 0xFF10B981;
+                float x0 = i * (bw + gap), y0 = top + h * (1 - fr);
+                c.drawRoundRect(x0, y0, x0 + bw, top + h, 2, 2, paint(col, 0));
+                if (labels > 0) {
+                    tp.setColor(col == 0xFF10B981 ? 0xFFE2E8F0 : col);
+                    c.drawText(String.format(java.util.Locale.US, "%.3f", v[i]), x0 + bw / 2, y0 - labels * 0.35f, tp);
+                    c.drawText(String.valueOf(i + 1), x0 + bw / 2, top + h + labels * 1.15f, np);
+                }
             }
         }
     }
@@ -138,7 +148,7 @@ final class Views {
 
     /** Тиждень: стовпчики СЕС/спожито. */
     static final class WeekChart extends View {
-        final float u; Object[][] d = new Object[0][];
+        final float u; Object[][] d = new Object[0][]; boolean big;
         static final String[] DN = {"Нд", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"};
         WeekChart(Context c, float u) { super(c); this.u = u; }
         @Override protected void onDraw(Canvas c) {
@@ -156,10 +166,13 @@ final class Views {
                 float hp = (float) (pv / mx * (h - padB - top)), hl = (float) (ld / mx * (h - padB - top));
                 c.drawRoundRect(x0 - bw - 1, h - padB - hp, x0 - 1, h - padB, 3, 3, paint(YEL, 0));
                 c.drawRoundRect(x0 + 1, h - padB - hl, x0 + bw + 1, h - padB, 3, 3, paint(PUR, 0));
-                if (ld > 0) c.drawText(String.format(java.util.Locale.US, "%.0f", ld), x0 + bw / 2, h - padB - hl - 5 * u, vp);
+                boolean wk = d.length <= 7;
+                if (ld > 0 && wk) c.drawText(String.format(java.util.Locale.US, "%.0f", ld), x0 + bw / 2, h - padB - hl - 5 * u, vp);
+                if (pv > 0 && wk && big) c.drawText(String.format(java.util.Locale.US, "%.0f", pv), x0 - bw / 2, h - padB - hp - 5 * u, vp);
                 cal.setTimeInMillis((Long) d[i][0]);
                 lp.setColor(i == d.length - 1 ? 0xFFFFFFFF : 0xFFCBD5E1);
-                c.drawText(DN[cal.get(Calendar.DAY_OF_WEEK) - 1], x0, h - 5 * u, lp);
+                if (wk) c.drawText(DN[cal.get(Calendar.DAY_OF_WEEK) - 1], x0, h - 5 * u, lp);
+                else if ((d.length - 1 - i) % 5 == 0) c.drawText(String.valueOf(cal.get(Calendar.DAY_OF_MONTH)), x0, h - 5 * u, lp);
             }
         }
     }
