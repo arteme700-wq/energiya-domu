@@ -27,7 +27,7 @@ public final class ListenService extends Service {
     private static final String TAG = "ListenService";
     static final String CH_SERVICE = "service", CH_ALERT = "alerts2";
     private volatile boolean running;
-    private Thread th;
+    private Thread th, upd;
     private volatile HttpURLConnection conn;
 
     static void start(Context c) {
@@ -57,6 +57,15 @@ public final class ListenService extends Service {
         else startForeground(1, n);
         running = true;
         th = new Thread(this::loop, "ntfy"); th.start();
+        // самооновлення: ~1 хв після старту, далі кожні 6 год
+        upd = new Thread(() -> {
+            try {
+                Thread.sleep(60_000);
+                Updater.check(this, false, 30 * 60_000L); // після старту — якщо не перевіряли останні 30 хв
+                while (running) { Thread.sleep(6 * 3600_000L); Updater.check(this, false, 6 * 3600_000L - 60_000L); }
+            } catch (InterruptedException ignored) { }
+        }, "upd");
+        upd.start();
     }
 
     @Override public int onStartCommand(Intent i, int f, int id) { return START_STICKY; }
@@ -65,6 +74,7 @@ public final class ListenService extends Service {
         running = false;
         HttpURLConnection c = conn; if (c != null) try { c.disconnect(); } catch (Exception ignored) { }
         if (th != null) th.interrupt();
+        if (upd != null) upd.interrupt();
         super.onDestroy();
     }
 

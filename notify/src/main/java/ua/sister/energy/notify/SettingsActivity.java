@@ -43,8 +43,8 @@ public final class SettingsActivity extends Activity {
         l.addView(Ui.text(this, "Оновлення (версія " + BuildConfig.VERSION_NAME + ")", 26, 0xFFFFFFFF, true));
         TextView u = Ui.button(this, "Перевірити оновлення", 0xFF334155);
         l.addView(u);
-        res = Ui.text(this, "", 20, 0xFFCBD5E1, false); l.addView(res);
-        u.setOnClickListener(v -> { res.setText("Перевіряю…"); new Thread(() -> { String r = Updater.check(this, true); h.post(() -> res.setText(r)); }).start(); });
+        res = Ui.text(this, Updater.last(this), 22, 0xFFE2E8F0, false); l.addView(res);
+        u.setOnClickListener(v -> { res.setText("Перевіряю…"); new Thread(() -> { Updater.check(this, true); h.post(() -> res.setText(Updater.last(this))); }).start(); });
         ScrollView sv = new ScrollView(this); sv.setBackgroundColor(0xFF0B1220); sv.addView(l);
         setContentView(sv);
     }

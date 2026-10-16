@@ -39,12 +39,29 @@ public final class Updater {
     private Updater() { }
 
     /** @return текст результату (для налаштувань / журналу). Виконувати не в UI-потоці. */
-    public static synchronized String check(Context ctx, boolean manual) {
+    public static String check(Context ctx, boolean manual) { return check(ctx, manual, 6 * 3600_000L); }
+
+    /** Остання перевірка: «дата · результат». */
+    public static String last(Context ctx) {
+        android.content.SharedPreferences sp = ctx.getSharedPreferences("upd", Context.MODE_PRIVATE);
+        long t = sp.getLong("last", 0);
+        if (t == 0) return "Остання перевірка: ще не було";
+        return "Остання перевірка: " + new java.text.SimpleDateFormat("dd.MM HH:mm", java.util.Locale.getDefault()).format(new java.util.Date(t))
+                + "\n" + sp.getString("res", "");
+    }
+
+    public static synchronized String check(Context ctx, boolean manual, long minGap) {
+        String r = doCheck(ctx, manual, minGap);
+        if (!"пізніше".equals(r)) ctx.getSharedPreferences("upd", Context.MODE_PRIVATE).edit().putString("res", r).apply();
+        return r;
+    }
+
+    private static String doCheck(Context ctx, boolean manual, long minGap) {
         try {
             String base = DEFAULT_URL;
             // не частіше ніж раз на 6 год, якщо не вручну
             android.content.SharedPreferences sp = ctx.getSharedPreferences("upd", Context.MODE_PRIVATE);
-            if (!manual && System.currentTimeMillis() - sp.getLong("last", 0) < 6 * 3600_000L) return "пізніше";
+            if (!manual && System.currentTimeMillis() - sp.getLong("last", 0) < minGap) return "пізніше";
             sp.edit().putLong("last", System.currentTimeMillis()).apply();
             if (!base.endsWith("/")) base += "/";
             // github.com/…/releases/latest/download/<файл> — без API і без лімітів запитів
@@ -63,7 +80,12 @@ public final class Updater {
             if (bad != null) { apk.delete(); return bad; }
             if (android.os.Build.VERSION.SDK_INT >= 26 && !ctx.getPackageManager().canRequestPackageInstalls()) {
                 Intent i = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, android.net.Uri.parse("package:" + ctx.getPackageName()));
-                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); ctx.startActivity(i);
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                if (manual) ctx.startActivity(i);
+                else if (!sp.getBoolean("askedPerm", false)) { // підказати один раз
+                    sp.edit().putBoolean("askedPerm", true).apply();
+                    notify(ctx, 3, "Оновлення " + name + " готове", "Натисніть і дозвольте «Встановлення невідомих додатків» для цього додатка", i);
+                }
                 return "Дозвольте встановлення з цього застосунку і натисніть «Перевірити» ще раз";
             }
             install(ctx, apk, name);
@@ -101,6 +123,8 @@ public final class Updater {
         PackageInstaller pi = ctx.getPackageManager().getPackageInstaller();
         PackageInstaller.SessionParams p = new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
         p.setAppPackageName(ctx.getPackageName());
+        // Android 12+: тихе самооновлення, якщо цей додаток — встановлювач оновлень і targetSdk свіжий
+        if (android.os.Build.VERSION.SDK_INT >= 31) p.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED);
         int id = pi.createSession(p);
         try (PackageInstaller.Session s = pi.openSession(id)) {
             try (InputStream in = new FileInputStream(apk); OutputStream out = s.openWrite("app.apk", 0, apk.length())) {
@@ -135,6 +159,17 @@ public final class Updater {
         throw new IOException("too many redirects");
     }
 
+    @SuppressWarnings("deprecation")
+    static void notify(Context c, int id, String title, String text, Intent tap) {
+        ListenService.channels(c);
+        PendingIntent pi = PendingIntent.getActivity(c, id, tap, PendingIntent.FLAG_UPDATE_CURRENT | (android.os.Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0));
+        android.app.Notification.Builder b = android.os.Build.VERSION.SDK_INT >= 26 ? new android.app.Notification.Builder(c, ListenService.CH_ALERT) : new android.app.Notification.Builder(c);
+        b.setSmallIcon(android.R.drawable.stat_sys_download_done).setContentTitle(title).setContentText(text)
+                .setStyle(new android.app.Notification.BigTextStyle().bigText(text))
+                .setPriority(android.app.Notification.PRIORITY_HIGH).setAutoCancel(true).setContentIntent(pi);
+        ((android.app.NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE)).notify(id, b.build());
+    }
+
     private static String hex(byte[] d) { StringBuilder sb = new StringBuilder(); for (byte x : d) sb.append(String.format("%02x", x)); return sb.toString(); }
 
     /** Результат сесії встановлення. */
@@ -143,7 +178,13 @@ public final class Updater {
             int st = i.getIntExtra(PackageInstaller.EXTRA_STATUS, -99);
             if (st == PackageInstaller.STATUS_PENDING_USER_ACTION) {
                 Intent confirm = i.getParcelableExtra(Intent.EXTRA_INTENT);
-                if (confirm != null) { confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); c.startActivity(confirm); }
+                if (confirm != null) {
+                    confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    Updater.notify(c, 3, "Оновлення готове — натисни Встановити", "Енергія — сповіщення: нова версія завантажена і перевірена", confirm);
+                    try { c.startActivity(confirm); } catch (Exception ignored) { } // з фону Android 10+ може не дозволити — тоді є сповіщення
+                }
+            } else if (st == PackageInstaller.STATUS_SUCCESS) {
+                ((android.app.NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE)).cancel(3);
             } else if (st != PackageInstaller.STATUS_SUCCESS) {
                 Log.w(TAG, "install status " + st + " " + i.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE));
             }
