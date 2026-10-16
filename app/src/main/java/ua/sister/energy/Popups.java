@@ -58,7 +58,7 @@ final class Popups {
         panel.setBackground(round(0xF5080F1F, px(10), 0x4094A3B8));
         panel.setClickable(true); // торкання всередині не закриває
         FrameLayout.LayoutParams plp = new FrameLayout.LayoutParams(-1, -1);
-        plp.setMargins(px(26), px(20), px(26), px(20));
+        plp.setMargins(px(26), px(a.alertActive() ? 132 : 20), px(26), px(20)); // не ховати під банером тривоги
         overlay.addView(panel, plp);
 
         FrameLayout hdr = new FrameLayout(a);
@@ -83,6 +83,7 @@ final class Popups {
             default: week(title, body); break;
         }
         root.addView(overlay, new FrameLayout.LayoutParams(-1, -1));
+        a.raiseOverlays();
         refresh();
     }
 

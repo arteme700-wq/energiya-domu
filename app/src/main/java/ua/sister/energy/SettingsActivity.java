@@ -34,6 +34,9 @@ public final class SettingsActivity extends Activity {
     private EditText ip, port, serial, slave, rated, cap, upd;
     private CheckBox demo, ntfyOn;
     private EditText socMin;
+    private EditText queue, lat, lon, region, kwp, tilt, azim, eff, nFrom, nTo;
+    private CheckBox alertSnd, outSnd, outSndN;
+    private android.widget.RadioGroup nightMode;
     private TextView bmsSel, status;
     private String bmsMac, bmsName;
     private final LinkedHashMap<String, String> found = new LinkedHashMap<>();
@@ -92,6 +95,28 @@ public final class SettingsActivity extends Activity {
         Button chk = new Button(this); chk.setText("Перевірити оновлення зараз"); l.addView(chk);
         chk.setOnClickListener(v -> { save(); status.setText("Перевіряю оновлення…"); new Thread(() -> { String r = Updater.check(this); h.post(() -> status.setText(r)); }).start(); });
         status = new TextView(this); status.setTextSize(16); l.addView(status);
+        title(l, "Тривоги, графік відключень, погода");
+        queue = field(l, "Черга (група) відключень ДТЕК КРЕМ, напр. 1.2", prefs.queue(), InputType.TYPE_CLASS_TEXT);
+        region = field(l, "Код району для тривог (siren.pp.ua; Броварський р-н = 79)", String.valueOf(prefs.alertRegion()), InputType.TYPE_CLASS_NUMBER);
+        alertSnd = new CheckBox(this); alertSnd.setText("Звук тривоги на планшеті (3 повтори)"); alertSnd.setTextSize(18); alertSnd.setChecked(prefs.alertSound()); l.addView(alertSnd);
+        outSnd = new CheckBox(this); outSnd.setText("Звук, коли зникає / з'являється світло (вдень)"); outSnd.setTextSize(18); outSnd.setChecked(prefs.outageSound()); l.addView(outSnd);
+        outSndN = new CheckBox(this); outSndN.setText("…і вночі"); outSndN.setTextSize(18); outSndN.setChecked(prefs.outageSoundNight()); l.addView(outSndN);
+        lat = field(l, "Широта (для погоди)", String.valueOf(prefs.lat()), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        lon = field(l, "Довгота", String.valueOf(prefs.lon()), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        kwp = field(l, "Потужність панелей, кВт", String.valueOf(prefs.pvKwp()), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        tilt = field(l, "Нахил панелей, ° (0 = горизонтально)", String.valueOf(prefs.pvTilt()), InputType.TYPE_CLASS_NUMBER);
+        azim = field(l, "Азимут, ° (0 = південь, −90 = схід, 90 = захід)", String.valueOf(prefs.pvAzimuth()), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_SIGNED);
+        eff = field(l, "Коефіцієнт системи (0.5–1.0)", String.valueOf(prefs.pvEff()), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        title(l, "Нічний режим");
+        nightMode = new android.widget.RadioGroup(this);
+        String[][] modes = {{"sun", "За заходом і сходом сонця"}, {"fixed", "За розкладом"}, {"off", "Вимкнено"}};
+        for (int i = 0; i < modes.length; i++) {
+            android.widget.RadioButton rb = new android.widget.RadioButton(this); rb.setId(100 + i); rb.setText(modes[i][1]); rb.setTextSize(18); rb.setTag(modes[i][0]);
+            nightMode.addView(rb); if (modes[i][0].equals(prefs.nightMode())) rb.setChecked(true);
+        }
+        l.addView(nightMode);
+        nFrom = field(l, "Розклад: з (ГГ:ХХ)", prefs.nightFrom(), InputType.TYPE_CLASS_DATETIME | InputType.TYPE_DATETIME_VARIATION_TIME);
+        nTo = field(l, "до (ГГ:ХХ)", prefs.nightTo(), InputType.TYPE_CLASS_DATETIME | InputType.TYPE_DATETIME_VARIATION_TIME);
         title(l, "Домашній екран");
         TextView hs = new TextView(this); hs.setTextSize(17); l.addView(hs);
         Button hb = new Button(this); l.addView(hb);
@@ -106,7 +131,7 @@ public final class SettingsActivity extends Activity {
         Button save = new Button(this); save.setText("Зберегти і повернутись"); l.addView(save);
         save.setOnClickListener(v -> { save(); finish(); });
         TextView note = new TextView(this); note.setTextSize(14);
-        note.setText("Відкрити налаштування: значок ⚙.\nДодаток лише читає дані: інвертор (Modbus 0x03) і BMS (запити стану). Жодних команд керування.");
+        note.setText("Відкрити налаштування: торкніться значка ⚡.\nДодаток лише читає дані: інвертор (Modbus 0x03) і BMS (запити стану). Жодних команд керування.");
         l.addView(note);
         ScrollView sv = new ScrollView(this); sv.addView(l);
         setContentView(sv);
@@ -125,6 +150,10 @@ public final class SettingsActivity extends Activity {
         l.addView(e); return e;
     }
 
+    private double dnum(EditText e, double def, double min, double max) {
+        try { double v = Double.parseDouble(e.getText().toString().trim().replace(',', '.')); return v < min || v > max ? def : v; } catch (Exception x) { return def; }
+    }
+
     private int num(EditText e, int def) { try { return Integer.parseInt(e.getText().toString().trim()); } catch (Exception x) { return def; } }
 
     private void save() {
@@ -132,6 +161,18 @@ public final class SettingsActivity extends Activity {
                 .putInt("port", num(port, 8899)).putInt("slave", num(slave, 1)).putFloat("rated", num(rated, 8000)).putFloat("cap_ah", num(cap, 420))
                 .putString("update_url", upd.getText().toString().trim()).putBoolean("demo", demo.isChecked()).putString("bms_mac", bmsMac).putString("bms_name", bmsName == null ? "" : bmsName)
                 .apply();
+        android.content.SharedPreferences.Editor e = prefs.edit();
+        String q = queue.getText().toString().trim(); if (q.matches("[1-6]\\.[12]")) e.putString("queue", q);
+        e.putInt("alert_region", Math.max(1, num(region, 79)));
+        e.putBoolean("alert_sound", alertSnd.isChecked()).putBoolean("outage_sound", outSnd.isChecked()).putBoolean("outage_sound_night", outSndN.isChecked());
+        e.putFloat("lat", (float) dnum(lat, 50.47, -90, 90)).putFloat("lon", (float) dnum(lon, 30.78, -180, 180));
+        e.putFloat("pv_kwp", (float) dnum(kwp, 5, 0.1, 100)).putInt("pv_tilt", (int) dnum(tilt, 30, 0, 90)).putInt("pv_azimuth", (int) dnum(azim, 0, -180, 180)).putFloat("pv_eff", (float) dnum(eff, 0.8, 0.3, 1.0));
+        View chk = nightMode.findViewById(nightMode.getCheckedRadioButtonId());
+        if (chk != null) e.putString("night_mode", (String) chk.getTag());
+        String nf1 = nFrom.getText().toString().trim(), nt1 = nTo.getText().toString().trim();
+        if (nf1.matches("\\d{1,2}:\\d{2}")) e.putString("night_from", nf1);
+        if (nt1.matches("\\d{1,2}:\\d{2}")) e.putString("night_to", nt1);
+        e.apply();
         new Notifier(this).edit().putBoolean("enabled", ntfyOn.isChecked()).putInt("soc_min", Math.max(5, Math.min(90, num(socMin, 20)))).apply();
     }
 
