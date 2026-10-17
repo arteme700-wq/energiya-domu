@@ -16,7 +16,19 @@ import android.widget.TextView;
 
 /** Підказки для Xiaomi / HyperOS: без цього система «вбиває» фонові застосунки. */
 public final class SettingsActivity extends Activity {
-    private TextView res;
+    private TextView res, stripState;
+
+    private LinearLayout.LayoutParams gap() { LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2); lp.setMargins(0, 6, 0, 18); return lp; }
+
+    private void stripRefresh() {
+        if (stripState == null) return;
+        Boolean a = StripOverlay.alert;
+        String st = a == null ? "Стан тривоги: ще перевіряю…" : a ? "Зараз: ТРИВОГА" : "Зараз: тривоги немає";
+        if (!StripOverlay.canDraw(this)) st += "\nНемає дозволу «Поверх інших додатків» — смуга не показується";
+        stripState.setText(st);
+    }
+
+    @Override protected void onResume() { super.onResume(); stripRefresh(); StripOverlay.apply(this); }
     private final Handler h = new Handler(Looper.getMainLooper());
 
     @Override protected void onCreate(Bundle b) {
@@ -40,6 +52,21 @@ public final class SettingsActivity extends Activity {
             else appDetails();
         });
         step(l, "4. Закріпити в недавніх", "Відкрийте список недавніх застосунків, потягніть картку вниз — з'явиться замочок.", null);
+        l.addView(Ui.text(this, "Червона смуга під час тривоги", 26, 0xFFFFFFFF, true));
+        l.addView(Ui.text(this, "Тихо, без звуку і сповіщень: під час повітряної тривоги (Броварський район) верх екрана стає червоним.", 21, 0xFFE2E8F0, false));
+        stripState = Ui.text(this, "", 22, 0xFFFACC15, true); l.addView(stripState);
+        TextView sw = Ui.button(this, "", 0xFF334155); l.addView(sw, gap());
+        sw.setText(StripOverlay.enabled(this) ? "Смуга: увімкнена (вимкнути)" : "Смуга: вимкнена (увімкнути)");
+        sw.setOnClickListener(v -> { StripOverlay.setEnabled(this, !StripOverlay.enabled(this));
+            sw.setText(StripOverlay.enabled(this) ? "Смуга: увімкнена (вимкнути)" : "Смуга: вимкнена (увімкнути)"); stripRefresh(); });
+        TextView perm = Ui.button(this, "Дозволити «Поверх інших додатків»", 0xFF059669); l.addView(perm, gap());
+        perm.setOnClickListener(v -> { if (Build.VERSION.SDK_INT >= 23
+                && !open(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())))) appDetails(); });
+        l.addView(Ui.text(this, "Якщо перемикач сірий: Налаштування → Додатки → «Енергія — сповіщення» → ⋮ → «Дозволити обмежені налаштування», потім знову ця кнопка.", 20, 0xFFCBD5E1, false));
+        TextView t5 = Ui.button(this, "Показати 5 с", 0xFFE11D48); l.addView(t5, gap());
+        t5.setOnClickListener(v -> { if (!StripOverlay.canDraw(this)) { stripState.setText("Спершу дайте дозвіл «Поверх інших додатків»"); return; }
+            StripOverlay.test5s(this); moveTaskToBack(true); });
+        stripRefresh();
         l.addView(Ui.text(this, "Оновлення (версія " + BuildConfig.VERSION_NAME + ")", 26, 0xFFFFFFFF, true));
         TextView u = Ui.button(this, "Перевірити оновлення", 0xFF334155);
         l.addView(u);

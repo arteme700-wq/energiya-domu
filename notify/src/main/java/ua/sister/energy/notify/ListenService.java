@@ -27,7 +27,7 @@ public final class ListenService extends Service {
     private static final String TAG = "ListenService";
     static final String CH_SERVICE = "service", CH_ALERT = "alerts2";
     private volatile boolean running;
-    private Thread th, upd;
+    private Thread th, upd, siren;
     private volatile HttpURLConnection conn;
 
     static void start(Context c) {
@@ -66,6 +66,8 @@ public final class ListenService extends Service {
             } catch (InterruptedException ignored) { }
         }, "upd");
         upd.start();
+        // тиха червона смуга під час тривоги (без звуку і сповіщень)
+        siren = new Thread(() -> StripOverlay.poll(this, () -> running), "siren"); siren.start();
     }
 
     @Override public int onStartCommand(Intent i, int f, int id) { return START_STICKY; }
@@ -75,6 +77,7 @@ public final class ListenService extends Service {
         HttpURLConnection c = conn; if (c != null) try { c.disconnect(); } catch (Exception ignored) { }
         if (th != null) th.interrupt();
         if (upd != null) upd.interrupt();
+        if (siren != null) siren.interrupt();
         super.onDestroy();
     }
 
