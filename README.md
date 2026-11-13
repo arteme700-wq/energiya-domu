@@ -29,3 +29,10 @@ adb shell dpm set-device-owner ua.sister.energy/.AdminReceiver
 Реліз містить `energiya-notify.apk` і `version-notify.json`; телефон перевіряє оновлення і пропонує встановити.
 
 Android 7 не довіряє сертифікатам Let's Encrypt (ntfy.sh) — тому в застосунки вбудовано кореневі сертифікати ISRG Root X1/X2 (`res/raw`, `network_security_config.xml`).
+
+## Віддалений моніторинг BMS (з 1.5.5)
+Планшет надсилає компактний стан JK BMS у хмарний MQTT (EMQX Cloud Serverless) під вшитим логіном **Hmarskie**
+(логін змінити не можна): раз на 60 с, кожні 5 с коли хтось дивиться цей логін на сторінці
+[BMS Remote](https://oselia.tail5a289e.ts.net/bms-remote/), події внутрішнього опору — одразу.
+Формат топіків і payload — як у додатку BMS LCD 0.3.1. Демо-дані не надсилаються.
+Облікові дані брокера вшиваються під час збірки з файлу секретів або змінних середовища, не з git.

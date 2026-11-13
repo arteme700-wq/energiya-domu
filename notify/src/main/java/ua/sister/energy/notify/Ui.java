@@ -22,4 +22,13 @@ final class Ui {
         GradientDrawable g = new GradientDrawable(); g.setColor(bg); g.setCornerRadius(28); b.setBackground(g);
         return b;
     }
+    /** Кнопка з рамкою (небезпечна дія, напр. «Очистити все»). */
+    static Button outline(Context c, String s, int bg, int stroke, int fg) {
+        Button b = button(c, s, bg); b.setTextColor(fg);
+        GradientDrawable g = new GradientDrawable(); g.setColor(bg); g.setCornerRadius(28); g.setStroke(6, stroke); b.setBackground(g);
+        return b;
+    }
+    static GradientDrawable panel(int bg, int stroke, float r) {
+        GradientDrawable g = new GradientDrawable(); g.setColor(bg); g.setCornerRadius(r); if (stroke != 0) g.setStroke(4, stroke); return g;
+    }
 }

@@ -1,5 +1,7 @@
 package ua.sister.energy;
 
+import ua.sister.energy.remote.Remote;
+
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Color;
@@ -35,7 +37,12 @@ public final class MainActivity extends Activity {
     private HandlerThread worker;
     private Handler bg, upd;
     private final Runnable updateTask = new Runnable() {
-        @Override public void run() { Log.i(TAG, "update: " + Updater.check(MainActivity.this)); upd.postDelayed(this, 6 * 3600 * 1000L); }
+        @Override public void run() {
+            android.content.SharedPreferences sp = getSharedPreferences("upd_chk", MODE_PRIVATE);
+            long now = System.currentTimeMillis(), lastChk = sp.getLong("ts", 0);
+            if (now - lastChk >= 3600 * 1000L || lastChk > now) { sp.edit().putLong("ts", now).apply(); Log.i(TAG, "update: " + Updater.check(MainActivity.this)); }
+            upd.postDelayed(this, 3600 * 1000L);
+        }
     };
     Prefs prefs;
     HistoryDb db;
@@ -43,6 +50,8 @@ public final class MainActivity extends Activity {
     private Notifier notifier;
     private final long startMs = System.currentTimeMillis();
     private BmsReader bms;
+    private Uploader uploader;
+    private Remote remote;
     private float u;
 
     private volatile Snapshot snap;
@@ -92,6 +101,9 @@ public final class MainActivity extends Activity {
         u = wpx / 1280f;
         builtQueue = prefs.queue();
         setContentView(build());
+        LanServer.apply(this);
+        remote = new Remote(this);
+        remote.start();
         worker = new HandlerThread("poll"); worker.start(); bg = new Handler(worker.getLooper());
         String was = getSharedPreferences("cfg", MODE_PRIVATE).getString("last_version", null);
         if (was != null && !was.equals(BuildConfig.VERSION_NAME))
@@ -152,9 +164,15 @@ public final class MainActivity extends Activity {
         bg.post(poll);
         if (bms != null) bms.stop();
         bms = null; bmsLink = false; cell = null; snap = null;
+        if (remote != null) remote.setDemo(prefs.demo());
         if (!prefs.demo() && !prefs.bmsMac().isEmpty()) {
             bms = new BmsReader(this, prefs.bmsMac(), new BmsReader.Listener() {
-                @Override public void onCell(JkBmsProtocol.CellInfo ci) { cell = ci; cellMs = System.currentTimeMillis(); }
+                @Override public void onCell(JkBmsProtocol.CellInfo ci) {
+                    long now = System.currentTimeMillis();
+                    cell = ci; cellMs = now;
+                    if (remote != null) remote.onCell(ci, now);
+                }
+                @Override public void onDevice(JkBmsProtocol.DeviceInfo di) { if (remote != null) remote.onDevice(di); }
                 @Override public void onStatus(boolean c) { bmsLink = c; }
             });
             bms.start();
@@ -177,6 +195,7 @@ public final class MainActivity extends Activity {
     @Override protected void onDestroy() {
         super.onDestroy();
         if (bms != null) bms.stop();
+        if (remote != null) remote.shutdown();
         worker.quitSafely();
         info.getLooper().quitSafely();
         sound.stop();
@@ -228,6 +247,11 @@ public final class MainActivity extends Activity {
             } catch (Exception e) {
                 Log.w(TAG, "poll", e);
             }
+            LanServer.update(snap, snapOkMs, cell, cellMs);
+            try {
+                if (uploader == null) uploader = new Uploader(MainActivity.this);
+                uploader.maybe(prefs, snap, snapOkMs, cell, cellMs);
+            } catch (Exception e) { Log.w(TAG, "upload", e); }
             try {
                 if (!prefs.demo() && !prefs.ip().isEmpty())
                     notifier.check(snap, snapOkMs, cell, cellMs, !prefs.bmsMac().isEmpty(), startMs);

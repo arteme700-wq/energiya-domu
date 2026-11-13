@@ -1,5 +1,7 @@
 package ua.sister.energy;
 
+import ua.sister.energy.remote.Remote;
+
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -31,8 +33,10 @@ import java.util.Locale;
 @SuppressLint("MissingPermission")
 public final class SettingsActivity extends Activity {
     private Prefs prefs;
+    private EditText srvUrl, srvTok;
     private EditText ip, port, serial, slave, rated, cap, upd;
-    private CheckBox demo, ntfyOn;
+    private CheckBox demo, ntfyOn, lanOn;
+    private EditText lanPort;
     private EditText socMin;
     private EditText queue, lat, lon, region, kwp, tilt, azim, eff, nFrom, nTo;
     private CheckBox alertSnd, outSnd, outSndN;
@@ -87,6 +91,41 @@ public final class SettingsActivity extends Activity {
         Button rg = new Button(this); rg.setText("Створити новий код (старі телефони перестануть отримувати)"); l.addView(rg);
         rg.setOnLongClickListener(v -> { nf.regenerate(); recreate(); return true; });
         rg.setOnClickListener(v -> status.setText("Утримуйте кнопку, щоб змінити код"));
+        title(l, "Віддалений моніторинг BMS");
+        TextView rst = new TextView(this);
+        rst.setTextSize(28);
+        rst.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        rst.setTextColor(Remote.statusColor());
+        rst.setText(Remote.statusUk());
+        l.addView(rst);
+        TextView rex = new TextView(this);
+        rex.setTextSize(22);
+        rex.setTextColor(0xFFFFFFFF);
+        rex.setPadding(0, 8, 0, 16);
+        rex.setText("Логін «Hmarskie» вшито в додаток і змінити його не можна.\n"
+                + "Стан батареї надсилається на сторінку BMS Remote Артема: раз на 60 с, "
+                + "або кожні 5 с, коли хтось відкриває цей логін. Події внутрішнього опору — одразу. "
+                + "У демо-режимі нічого не надсилається.");
+        l.addView(rex);
+        title(l, "Передача даних на сервер Артема");
+        srvUrl = bigField(l, "Адреса сервера (повна, .../api/sister/push)", prefs.serverUrl(), InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        srvTok = bigField(l, "Токен доступу", prefs.serverToken(), InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        TextView ust = new TextView(this); ust.setTextSize(20); ust.setText(new Uploader(this).status()); l.addView(ust);
+        title(l, "Екран для iPad (сторінка в домашній мережі)");
+        lanOn = new CheckBox(this); lanOn.setText("Віддавати сторінку моніторингу в Wi‑Fi"); lanOn.setTextSize(20); lanOn.setChecked(prefs.lanOn()); l.addView(lanOn);
+        lanPort = bigField(l, "Порт (типово 8080)", String.valueOf(prefs.lanPort()), InputType.TYPE_CLASS_NUMBER);
+        String lip = LanServer.lanIp();
+        TextView lu = new TextView(this); lu.setTextSize(26); lu.setTypeface(android.graphics.Typeface.DEFAULT_BOLD); lu.setTextIsSelectable(true);
+        lu.setText(lip == null ? "Немає Wi‑Fi адреси" : "http://" + lip + ":" + prefs.lanPort() + "/" + (LanServer.running() ? "" : "  (вимкнено)"));
+        l.addView(lu);
+        TextView la = new TextView(this); la.setTextSize(22); la.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        boolean adbOn = AdbWifi.listening(AdbWifi.PORT);
+        la.setText((adbOn ? "Wi‑Fi ADB: увімкнено, порт " : "Wi‑Fi ADB: вимкнено (порт ") + AdbWifi.PORT + (adbOn ? "" : ")")
+                + (lip == null ? "" : "\nСлужбова сторінка: http://" + lip + ":" + prefs.lanPort() + "/adb"));
+        la.setTextColor(adbOn ? 0xFF16A34A : 0xFFD97706); l.addView(la);
+        TextView lt = new TextView(this); lt.setTextSize(17);
+        lt.setText("Відкрийте цю адресу на iPad у Safari (та сама Wi‑Fi). Щоб адреса не змінювалась: у роутері MikroTik (WinBox / веб) → IP → DHCP Server → Leases → знайти цей планшет → «Make Static». На iPad: «Поділитися» → «На екран Додому», потім Guided Access (потрійний Home).");
+        l.addView(lt);
         title(l, "Оновлення (версія " + BuildConfig.VERSION_NAME + (Updater.isOwner(this) ? ", тихе встановлення" : "") + ")");
         upd = field(l, "Адреса перевірки (порожньо = GitHub)", prefs.updateUrl().equals(Updater.DEFAULT_URL) ? "" : prefs.updateUrl(), InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         TextView last = new TextView(this); last.setTextSize(16);
@@ -144,6 +183,12 @@ public final class SettingsActivity extends Activity {
         t.setTypeface(android.graphics.Typeface.DEFAULT_BOLD); l.addView(t);
     }
 
+    private EditText bigField(LinearLayout l, String hint, String val, int type) {
+        TextView t = new TextView(this); t.setText(hint); t.setTextSize(20); l.addView(t);
+        EditText e = new EditText(this); e.setText(val); e.setInputType(type); e.setTextSize(22); e.setSingleLine(true);
+        l.addView(e); return e;
+    }
+
     private EditText field(LinearLayout l, String hint, String val, int type) {
         TextView t = new TextView(this); t.setText(hint); t.setTextSize(15); l.addView(t);
         EditText e = new EditText(this); e.setText(val); e.setInputType(type); e.setTextSize(19); e.setSingleLine(true);
@@ -160,6 +205,7 @@ public final class SettingsActivity extends Activity {
         prefs.edit().putString("ip", ip.getText().toString().trim()).putString("serial", serial.getText().toString().trim())
                 .putInt("port", num(port, 8899)).putInt("slave", num(slave, 1)).putFloat("rated", num(rated, 8000)).putFloat("cap_ah", num(cap, 420))
                 .putString("update_url", upd.getText().toString().trim()).putBoolean("demo", demo.isChecked()).putString("bms_mac", bmsMac).putString("bms_name", bmsName == null ? "" : bmsName)
+                .putString("server_url", srvUrl.getText().toString().trim()).putString("server_token", srvTok.getText().toString().trim())
                 .apply();
         android.content.SharedPreferences.Editor e = prefs.edit();
         String q = queue.getText().toString().trim(); if (q.matches("[1-6]\\.[12]")) e.putString("queue", q);
@@ -172,7 +218,10 @@ public final class SettingsActivity extends Activity {
         String nf1 = nFrom.getText().toString().trim(), nt1 = nTo.getText().toString().trim();
         if (nf1.matches("\\d{1,2}:\\d{2}")) e.putString("night_from", nf1);
         if (nt1.matches("\\d{1,2}:\\d{2}")) e.putString("night_to", nt1);
+        int lp = num(lanPort, LanServer.DEFAULT_PORT); if (lp < 1024 || lp > 65535) lp = LanServer.DEFAULT_PORT;
+        e.putBoolean("lan_on", lanOn.isChecked()).putInt("lan_port", lp);
         e.apply();
+        LanServer.apply(this);
         new Notifier(this).edit().putBoolean("enabled", ntfyOn.isChecked()).putInt("soc_min", Math.max(5, Math.min(90, num(socMin, 20)))).apply();
     }
 

@@ -44,5 +44,23 @@ final class Store {
         } catch (Exception ignored) { }
     }
 
+    /** Видаляє всю історію подій (лише на цьому телефоні). */
+    synchronized void clearMessages() { p.edit().putString("msgs", "[]").apply(); }
+
+    /** Видаляє одну подію (перший збіг за часом, заголовком і текстом). @return true, якщо видалено. */
+    synchronized boolean removeMessage(long t, String title, String msg) {
+        try {
+            JSONArray a = new JSONArray(p.getString("msgs", "[]")), b = new JSONArray();
+            boolean done = false;
+            for (int i = 0; i < a.length(); i++) {
+                JSONObject m = a.optJSONObject(i);
+                if (!done && m != null && m.optLong("t") == t && m.optString("title").equals(title) && m.optString("msg").equals(msg)) { done = true; continue; }
+                b.put(a.get(i));
+            }
+            if (done) p.edit().putString("msgs", b.toString()).apply();
+            return done;
+        } catch (Exception e) { return false; }
+    }
+
     JSONArray messages() { try { return new JSONArray(p.getString("msgs", "[]")); } catch (Exception e) { return new JSONArray(); } }
 }

@@ -25,7 +25,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 /**
- * Тиха червона смуга під рядком стану під час повітряної тривоги (Броварський район, запасний — Київська обл.).
+ * Тиха жовта/червона (за рівнем тривоги) смуга під рядком стану під час повітряної тривоги (Броварський район, запасний — Київська обл.).
  * Без звуку і без сповіщень. Вікно TYPE_APPLICATION_OVERLAY лежить під системним рядком стану,
  * тож червоне видно крізь його прозорий фон, а годинник і значки — поверх.
  */
@@ -37,6 +37,10 @@ final class StripOverlay {
     /** Останній відомий стан тривоги (null — ще не знаємо). */
     static volatile Boolean alert = null;
     static volatile long checkedMs = 0;
+    /** Рівень тривоги: "yellow" (загроза дронів) або "red"; порожньо — невідомо (показуємо червоним). */
+    static volatile String level = "";
+    private static String shownLevel = null;
+    static final int YELLOW = 0xFFF5BE14, RED = 0xFFE11D48;
 
     private static View view;
     private static final Handler ui = new Handler(Looper.getMainLooper());
@@ -64,7 +68,10 @@ final class StripOverlay {
 
     @SuppressWarnings("deprecation")
     private static void show(Context c) {
-        if (view != null) return;
+        String lv = test ? "" : level;
+        if (view != null && lv.equals(shownLevel)) return;
+        if (view != null) hide(c);
+        shownLevel = lv;
         WindowManager wm = (WindowManager) c.getSystemService(Context.WINDOW_SERVICE);
         int type = Build.VERSION.SDK_INT >= 26 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
         WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
@@ -82,15 +89,16 @@ final class StripOverlay {
         }
         lp.setTitle("energiya-alert-strip");
         View v = new View(c);
+        int col = "yellow".equals(lv) ? YELLOW : RED, rgb = col & 0xFFFFFF;
         v.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0xFFE11D48, 0xE6E11D48, 0x00E11D48}));
+                new int[]{col, 0xE6000000 | rgb, rgb}));
         try { wm.addView(v, lp); view = v; } catch (Exception e) { Log.w(TAG, "addView", e); }
     }
 
     private static void hide(Context c) {
         if (view == null) return;
         try { ((WindowManager) c.getSystemService(Context.WINDOW_SERVICE)).removeView(view); } catch (Exception ignored) { }
-        view = null;
+        view = null; shownLevel = null;
     }
 
     private static int statusBarHeight(Context c, WindowManager wm) {
@@ -120,9 +128,11 @@ final class StripOverlay {
             while (running.getAsBoolean()) {
                 try {
                     Boolean was = alert;
-                    alert = fetch();
+                    String[] lv = new String[1];
+                    alert = fetch(lv);
+                    level = lv[0] == null ? "" : lv[0];
                     checkedMs = System.currentTimeMillis();
-                    if (!alert.equals(was)) Log.i(TAG, "alert=" + alert);
+                    if (!alert.equals(was)) Log.i(TAG, "alert=" + alert + " level=" + level);
                 } catch (Exception e) { Log.w(TAG, "fetch: " + e); } // залишаємо останній відомий стан
                 apply(c);
                 long wait = pm.isInteractive() ? 30_000 : 120_000;
@@ -135,17 +145,28 @@ final class StripOverlay {
         }
     }
 
-    static boolean fetch() throws Exception {
+    static boolean fetch() throws Exception { return fetch(new String[1]); }
+
+    /** @param lvOut [0] ← "yellow"/"red"/null (activeAlertLevels; червоний переважає, як на планшеті Оселя). */
+    static boolean fetch(String[] lvOut) throws Exception {
         String body;
         try { body = get(SIREN + REGION); } catch (Exception e) { body = get(SIREN + FALLBACK); }
         JSONArray arr = new JSONArray(body);
         if (arr.length() == 0) throw new Exception("empty");
         JSONArray act = arr.getJSONObject(0).optJSONArray("activeAlerts");
+        boolean on = false;
         if (act != null) for (int i = 0; i < act.length(); i++) {
             JSONObject x = act.getJSONObject(i);
-            if ("AIR".equals(x.optString("type", "AIR"))) return true;
+            if (!"AIR".equals(x.optString("type", "AIR"))) continue;
+            on = true;
+            JSONArray lv = x.optJSONArray("activeAlertLevels");
+            if (lv != null) for (int k = 0; k < lv.length(); k++) {
+                JSONObject o = lv.optJSONObject(k);
+                String l = o == null ? "" : o.optString("alertLevel", "").toLowerCase(java.util.Locale.US);
+                if ("red".equals(l) || (!l.isEmpty() && lvOut[0] == null)) lvOut[0] = l;
+            }
         }
-        return false;
+        return on;
     }
 
     private static String get(String url) throws Exception {

@@ -1,0 +1,32 @@
+<!DOCTYPE html><html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Планшет — службове</title><style>
+body{margin:0;padding:20px;background:#000;color:#fff;font-family:Helvetica,Arial,sans-serif;font-size:26px;line-height:1.4}
+h1{font-size:36px;margin:0 0 16px}
+.st{font-size:40px;font-weight:bold;padding:16px;border:4px solid #fff;border-radius:14px;margin-bottom:16px}
+.on{color:#4ade80;border-color:#4ade80}.off{color:#fbbf24;border-color:#fbbf24}
+.row{margin:6px 0}.row b{color:#fde047}
+button{display:block;width:100%;font-size:34px;font-weight:bold;padding:24px;margin:16px 0;border:0;border-radius:14px;-webkit-appearance:none}
+#en{background:#22c55e;color:#000}#dis{background:#444;color:#fff;font-size:26px;padding:16px}
+#res{font-size:28px;padding:16px;border-radius:14px;background:#1e293b;min-height:40px;white-space:pre-wrap}
+a{color:#93c5fd}
+</style></head><body>
+<h1>Службове: Wi‑Fi ADB</h1>
+<div id="st" class="st">Перевіряю…</div>
+<div class="row">IP планшета: <b id="ip">—</b></div>
+<div class="row">Порт: <b id="port">5555</b></div>
+<div class="row">Налагодження USB: <b id="usb">—</b> · root: <b id="root">—</b></div>
+<button id="en" onclick="act('/api/adb-wifi')">Увімкнути Wi‑Fi ADB</button>
+<div id="res"></div>
+<button id="dis" onclick="act('/api/adb-wifi-off')">Вимкнути Wi‑Fi ADB</button>
+<div class="row" style="font-size:22px;color:#cbd5e1">Без root (Android 7) додаток не може сам увімкнути Wi‑Fi ADB. Тоді після кожного перезавантаження потрібно один раз USB-кабель і команда <b>adb tcpip 5555</b>. З root/Magisk кнопка вмикає одразу.</div>
+<p><a href="/">← Екран енергії</a></p>
+<script>
+function $(i){return document.getElementById(i)}
+function show(j){var on=!!j.on;$('st').className='st '+(on?'on':'off');$('st').innerHTML=on?'● Wi‑Fi ADB УВІМКНЕНО':'○ Wi‑Fi ADB вимкнено';
+$('ip').innerHTML=j.ip||'—';$('port').innerHTML=j.port||5555;$('usb').innerHTML=j.usb_debug?'так':'ні';$('root').innerHTML=j.root?'є':'немає';}
+function get(){var x=new XMLHttpRequest();x.open('GET','/api/adb.json?'+Date.now());x.onload=function(){try{show(JSON.parse(x.responseText))}catch(e){}};x.onerror=function(){$('st').innerHTML='⚠ немає зв’язку з планшетом'};x.send()}
+function act(u){$('res').innerHTML='Зачекайте…';var x=new XMLHttpRequest();x.open('POST',u);x.setRequestHeader('X-Sister','1');
+x.onload=function(){try{var j=JSON.parse(x.responseText);show(j);$('res').innerHTML=(j.ok?'✔ ':'✖ ')+j.text}catch(e){$('res').innerHTML='Помилка: '+x.status}};
+x.onerror=function(){$('res').innerHTML='⚠ немає зв’язку з планшетом'};x.send('')}
+get();setInterval(get,5000);
+</script></body></html>

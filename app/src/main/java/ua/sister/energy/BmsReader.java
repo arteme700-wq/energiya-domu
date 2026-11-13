@@ -27,7 +27,11 @@ public final class BmsReader {
     private static final UUID CHR = UUID.fromString("0000ffe1-0000-1000-8000-00805f9b34fb");
     private static final UUID CCCD = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
 
-    public interface Listener { void onCell(JkBmsProtocol.CellInfo ci); void onStatus(boolean connected); }
+    public interface Listener {
+        void onCell(JkBmsProtocol.CellInfo ci);
+        void onStatus(boolean connected);
+        default void onDevice(JkBmsProtocol.DeviceInfo di) {}
+    }
 
     private final Context ctx;
     private final String mac;
@@ -52,6 +56,15 @@ public final class BmsReader {
             if (!running) return;
             if (System.currentTimeMillis() - lastFrame > 60000) { close(); connect(); }
             h.postDelayed(this, 30000);
+        }
+    };
+
+    /** Повторний запит даних банок — для живого екрана, IR і відправки кожні 5 с під час перегляду. */
+    private final Runnable cellPoll = new Runnable() {
+        @Override public void run() {
+            if (!running || gatt == null) return;
+            poll(JkBmsProtocol.CMD_CELL_INFO);
+            h.postDelayed(this, 3000);
         }
     };
 
@@ -85,6 +98,8 @@ public final class BmsReader {
             if (d != null) { d.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE); g.writeDescriptor(d); }
             h.postDelayed(() -> poll(JkBmsProtocol.CMD_DEVICE_INFO), 500);
             h.postDelayed(() -> poll(JkBmsProtocol.CMD_CELL_INFO), 1800);
+            h.removeCallbacks(cellPoll);
+            h.postDelayed(cellPoll, 5000);
             h.post(() -> listener.onStatus(true));
         }
         @Override public void onCharacteristicChanged(BluetoothGatt g, BluetoothGattCharacteristic c) {
@@ -113,6 +128,8 @@ public final class BmsReader {
                 protocol = JkBmsProtocol.detectProtocol(f, protocol);
                 lastFrame = System.currentTimeMillis();
                 listener.onCell(JkBmsProtocol.parseCellInfo(f, protocol, cellCount));
+            } else if (t == 0x03) {
+                listener.onDevice(JkBmsProtocol.parseDeviceInfo(f));
             }
         } catch (Exception e) { Log.w(TAG, "parse", e); }
     }

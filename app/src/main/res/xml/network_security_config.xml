@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Старі Android 7 не мають коренів Let's Encrypt (ntfy.sh, файли релізів GitHub) і можуть не мати USERTrust (github.com) -->
+<!-- Старі Android 7 можуть не мати коренів Let's Encrypt (ntfy.sh, GitHub), USERTrust (github.com)
+     і DigiCert Global Root G2 / Global Root CA (ланцюг брокера EMQX Cloud). -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
@@ -10,6 +11,8 @@
             <certificates src="@raw/isrg_root_ye"/>
             <certificates src="@raw/usertrust_ecc_certification_authority"/>
             <certificates src="@raw/usertrust_rsa_certification_authority"/>
+            <certificates src="@raw/digicert_global_root_g2"/>
+            <certificates src="@raw/digicert_global_root_ca"/>
         </trust-anchors>
     </base-config>
 </network-security-config>

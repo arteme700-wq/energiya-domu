@@ -23,7 +23,7 @@ public final class SettingsActivity extends Activity {
     private void stripRefresh() {
         if (stripState == null) return;
         Boolean a = StripOverlay.alert;
-        String st = a == null ? "Стан тривоги: ще перевіряю…" : a ? "Зараз: ТРИВОГА" : "Зараз: тривоги немає";
+        String st = a == null ? "Стан тривоги: ще перевіряю…" : a ? ("yellow".equals(StripOverlay.level) ? "Зараз: ТРИВОГА — жовтий рівень (дрони)" : "red".equals(StripOverlay.level) ? "Зараз: ТРИВОГА — червоний рівень" : "Зараз: ТРИВОГА") : "Зараз: тривоги немає";
         if (!StripOverlay.canDraw(this)) st += "\nНемає дозволу «Поверх інших додатків» — смуга не показується";
         stripState.setText(st);
     }

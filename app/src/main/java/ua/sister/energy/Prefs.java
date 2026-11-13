@@ -33,5 +33,11 @@ public final class Prefs {
     public String nightMode() { return p.getString("night_mode", "sun"); }
     public String nightFrom() { return p.getString("night_from", "22:00"); }
     public String nightTo() { return p.getString("night_to", "07:00"); }
+    public static final String DEFAULT_SERVER_URL = "https://oselia.tail5a289e.ts.net/api/sister/push";
+    public static final String DEFAULT_SERVER_TOKEN = "774ffefbbfd8931a127ba61a0fbd23f842741f5b097c45d376779aac8ef9d2fe";
+    public String serverUrl() { String u = p.getString("server_url", "").trim(); return u.isEmpty() ? DEFAULT_SERVER_URL : u; }
+    public String serverToken() { String u = p.getString("server_token", "").trim(); return u.isEmpty() ? DEFAULT_SERVER_TOKEN : u; }
+    public boolean lanOn() { return p.getBoolean("lan_on", true); }
+    public int lanPort() { return p.getInt("lan_port", LanServer.DEFAULT_PORT); }
     public SharedPreferences.Editor edit() { return p.edit(); }
 }
