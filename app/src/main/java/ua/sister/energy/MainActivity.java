@@ -50,6 +50,8 @@ public final class MainActivity extends Activity {
     private Notifier notifier;
     private final long startMs = System.currentTimeMillis();
     private BmsReader bms;
+    private String activeBmsMac = "";
+    private boolean lastDemo;
     private Uploader uploader;
     private Remote remote;
     private float u;
@@ -117,6 +119,7 @@ public final class MainActivity extends Activity {
             try { weather = Info.weather(this, prefs, true); } catch (Exception ignored) { }
         });
         info.post(alertTask); info.postDelayed(outageTask, 2000); info.postDelayed(weatherTask, 4000);
+        lastDemo = prefs.demo();
     }
 
     // ---------- інформація ----------
@@ -162,21 +165,8 @@ public final class MainActivity extends Activity {
         prefs = new Prefs(this);
         bg.removeCallbacksAndMessages(null);
         bg.post(poll);
-        if (bms != null) bms.stop();
-        bms = null; bmsLink = false; cell = null; snap = null;
         if (remote != null) remote.setDemo(prefs.demo());
-        if (!prefs.demo() && !prefs.bmsMac().isEmpty()) {
-            bms = new BmsReader(this, prefs.bmsMac(), new BmsReader.Listener() {
-                @Override public void onCell(JkBmsProtocol.CellInfo ci) {
-                    long now = System.currentTimeMillis();
-                    cell = ci; cellMs = now;
-                    if (remote != null) remote.onCell(ci, now);
-                }
-                @Override public void onDevice(JkBmsProtocol.DeviceInfo di) { if (remote != null) remote.onDevice(di); }
-                @Override public void onStatus(boolean c) { bmsLink = c; }
-            });
-            bms.start();
-        }
+        ensureBms();
         ui.removeCallbacksAndMessages(null);
         ui.post(tick);
         flow.setRunning(true);
@@ -190,11 +180,33 @@ public final class MainActivity extends Activity {
         if (night != null) night.update();
     }
 
+    private void ensureBms() {
+        boolean demo = prefs.demo();
+        if (demo != lastDemo) { snap = null; lastDemo = demo; }
+        String want = demo ? "" : prefs.bmsMac().trim();
+        if (want.equals(activeBmsMac) && (want.isEmpty() || bms != null)) return;
+        if (bms != null) { bms.stop(); bms = null; }
+        bmsLink = false; cell = null;
+        activeBmsMac = want;
+        if (want.isEmpty()) return;
+        bms = new BmsReader(this, want, new BmsReader.Listener() {
+            @Override public void onCell(JkBmsProtocol.CellInfo ci) {
+                long now = System.currentTimeMillis();
+                cell = ci; cellMs = now;
+                if (remote != null) remote.onCell(ci, now);
+            }
+            @Override public void onDevice(JkBmsProtocol.DeviceInfo di) { if (remote != null) remote.onDevice(di); }
+            @Override public void onStatus(boolean c) { bmsLink = c; }
+        });
+        bms.start();
+    }
+
     @Override protected void onPause() { super.onPause(); flow.setRunning(false); }
 
     @Override protected void onDestroy() {
         super.onDestroy();
-        if (bms != null) bms.stop();
+        if (bms != null) { bms.stop(); bms = null; }
+        activeBmsMac = "";
         if (remote != null) remote.shutdown();
         worker.quitSafely();
         info.getLooper().quitSafely();
